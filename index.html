@@ -226,8 +226,8 @@
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold font-['Merriweather']">Slide Extractor: Page-by-Page</h2>
             <div class="flex gap-3">
-                <button class="px-4 py-2 bg-slate-700 text-white rounded font-bold hover:bg-slate-600 transition" onclick="lecture_generateAll()"><i class="fas fa-magic mr-2"></i> Generate All</button>
-                <button class="px-4 py-2 bg-sky-500 text-slate-900 rounded font-bold hover:bg-sky-400 transition shadow-lg shadow-sky-500/20" onclick="lecture_compile()"><i class="fas fa-layer-group mr-2"></i> Compile Slides</button>
+                <button class="px-4 py-2 bg-slate-700 text-white rounded font-bold hover:bg-slate-600 transition cursor-pointer border-0" onclick="lecture_generateAll()"><i class="fas fa-magic mr-2"></i> Generate All</button>
+                <button class="px-4 py-2 bg-sky-500 text-slate-900 rounded font-bold hover:bg-sky-400 transition shadow-lg shadow-sky-500/20 cursor-pointer border-0" onclick="lecture_compile()"><i class="fas fa-layer-group mr-2"></i> Compile Slides</button>
             </div>
         </div>
         <div id="lecture-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
@@ -341,10 +341,10 @@
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-semibold text-slate-200">Video Studio: Frame-by-Frame Generation</h2>
                 <div class="flex gap-3">
-                    <button class="bg-slate-800 border border-slate-700 text-white px-4 py-2 rounded-lg font-semibold hover:bg-slate-700 transition" onclick="ew_generateAll()">
+                    <button class="bg-slate-800 border border-slate-700 text-white px-4 py-2 rounded-lg font-semibold hover:bg-slate-700 transition cursor-pointer" onclick="ew_generateAll()">
                         <i data-lucide="play" class="w-4 h-4 inline mr-1"></i> Generate All
                     </button>
-                    <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-500 transition shadow-lg shadow-indigo-500/20" onclick="ew_compileVideo()">
+                    <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-500 transition shadow-lg shadow-indigo-500/20 cursor-pointer border-0" onclick="ew_compileVideo()">
                         <i data-lucide="film" class="w-4 h-4 inline mr-1"></i> Compile Video
                     </button>
                 </div>
@@ -496,154 +496,226 @@
             showMsg("API Key Cleared", "Your API key has been removed from local storage.");
         }
 
+
+        window.lectureImages = [];
+        window.lectureGeneratedSlides = {};
+
         async function handleFile(e) {
             const file = e.target.files[0];
             if (!file || !file.name.endsWith('.pdf')) return showMsg("Invalid File", "Please select a PDF.");
             
             if (!apiKey) {
-                apiKey = prompt("Please enter your Google AI Studio API key (get it free from aistudio.google.com):");
+                requestGlobalApiKey();
                 if (!apiKey) {
-                    e.target.value = ''; // reset input
+                    e.target.value = '';
                     return;
                 }
-                localStorage.setItem('gemini_api_key', apiKey);
             }
             
             document.getElementById('scanner').style.display = 'block';
-            document.getElementById('main-icon').className = 'fas fa-brain fa-pulse';
-            document.getElementById('status-title').innerText = "AI Vision Active";
-            document.getElementById('status-desc').innerText = `Analyzing ${file.name}... Recreating data plots and extracting full content. This can take 30-60 seconds.`;
+            document.getElementById('status-title').innerText = "Extracting Pages...";
+            document.getElementById('status-desc').innerText = `Extracting high-resolution images from ${file.name}.`;
 
             try {
-                const reader = new FileReader();
-                const base64Promise = new Promise(res => {
-                    reader.onload = () => res(reader.result.split(',')[1]);
-                    reader.readAsDataURL(file);
-                });
-                const base64 = await base64Promise;
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                const numPages = pdf.numPages;
+                window.lectureImages = [];
+                
+                for (let i = 1; i <= numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({scale: 2.0}); 
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    await page.render({canvasContext: ctx, viewport: viewport}).promise;
+                    window.lectureImages.push(canvas.toDataURL('image/png'));
+                }
 
-                const data = await fetchSlides(base64);
-                window.currentData = data; 
-                
-                await renderDecks(data);
-                
                 document.getElementById('upload-screen').style.display = 'none';
-                document.getElementById('presentation-area').style.display = 'flex';
-                document.getElementById('export-btn').style.display = 'flex';
-                showMsg("Success", "Generated " + (data.slides ? data.slides.length : 0) + " exhaustive slides.");
+                document.getElementById('lecture-processing-screen').style.display = 'block';
+                
+                renderLectureGrid();
 
             } catch (err) {
-                console.error(err);
-                showMsg("Error", err.message || "Extraction failed.");
-                document.getElementById('scanner').style.display = 'none';
-                document.getElementById('main-icon').className = 'fas fa-file-import';
-                document.getElementById('status-title').innerText = "Deep Analysis Engine";
-                document.getElementById('status-desc').innerText = "Upload a university PDF. We will extract all equations, tables, and graphs.";
-                e.target.value = ''; // reset input
+                showMsg("Error", "Failed to extract PDF: " + err.message);
             }
         }
 
-        async function fetchSlides(base64) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-            
-            const prompt = `
-                ACT AS: Senior University Professor.
-                TASK: Exhaustive extraction of the attached PDF into a structured slide deck.
-                STRICT RULES:
-                1. EXTRACT ALL: Cover all major sections. Generate between 10 to 12 slides maximum to prevent output truncation.
-                2. MATH: Use raw LaTeX wrapped in $ (e.g. $10^2$, $C_p$). Ensure subscripts (_) and superscripts (^) are correct.
-                3. STANDALONE MATH: Use 'equation' layout for prominent formulas.
-                4. TABLES: Use strict standard HTML <table> tags for tabular data.
-                5. GRAPHS: Use 'chart' layout for data plots. Extract approximate numerical coordinates for (x,y).
-                6. NO PROFESSOR NOTES: Use 'key_insight' field only.
-                7. RESPONSE FORMAT: Return ONLY a valid JSON object. Do not include extra text or markdown code blocks.
-            `;
-
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "application/pdf", data: base64 } }] }],
-                    generationConfig: { 
-                        responseMimeType: "application/json", 
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                slides: {
-                                    type: "ARRAY",
-                                    items: {
-                                        type: "OBJECT",
-                                        properties: {
-                                            layout: { type: "STRING", description: "Must be: title | content | equation | table | chart | diagram" },
-                                            title: { type: "STRING", description: "The title of the slide" },
-                                            bullets: { type: "ARRAY", items: { type: "STRING" }, description: "Array of bullet points for the slide content. Must be generated for all text-heavy slides." },
-                                            latex: { type: "STRING" },
-                                            table_html: { type: "STRING" },
-                                            chart_data: { 
-                                                type: "OBJECT",
-                                                properties: {
-                                                    type: { type: "STRING" },
-                                                    x_label: { type: "STRING" },
-                                                    y_label: { type: "STRING" },
-                                                    y_scale: { type: "STRING" },
-                                                    datasets: {
-                                                        type: "ARRAY",
-                                                        items: {
-                                                            type: "OBJECT",
-                                                            properties: {
-                                                                label: { type: "STRING" },
-                                                                data: {
-                                                                    type: "ARRAY",
-                                                                    items: {
-                                                                        type: "OBJECT",
-                                                                        properties: {
-                                                                            x: { type: "NUMBER" },
-                                                                            y: { type: "NUMBER" }
-                                                                        },
-                                                                        required: ["x", "y"]
-                                                                    }
-                                                                }
-                                                            },
-                                                            required: ["label", "data"]
-                                                        }
-                                                    }
-                                                },
-                                                required: ["type", "datasets"]
-                                            },
-                                            mermaid_code: { type: "STRING" },
-                                            key_insight: { type: "STRING", description: "Explanatory insight for students." }
-                                        },
-                                        required: ["layout", "title", "bullets"]
-                                    }
-                                }
-                            },
-                            required: ["slides"]
-                        },
-                        maxOutputTokens: 8192,
-                        temperature: 0.2
-                    }
-                })
+        function renderLectureGrid() {
+            const grid = document.getElementById('lecture-grid');
+            grid.innerHTML = '';
+            window.lectureImages.forEach((imgBase64, index) => {
+                const statusHTML = window.lectureGeneratedSlides[index] 
+                    ? `<span class="text-emerald-400 font-semibold text-sm flex items-center gap-1"><i class="fas fa-check-circle"></i> Done (${window.lectureGeneratedSlides[index].length})</span>`
+                    : `<span class="text-slate-400 font-semibold text-sm flex items-center gap-1" id="lecture-status-${index}"><i class="fas fa-clock"></i> Pending</span>`;
+                    
+                grid.innerHTML += `
+                    <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col items-center shadow-lg">
+                        <img src="${imgBase64}" class="w-full aspect-[4/3] object-contain bg-black/50 rounded-lg mb-4 border border-slate-700" />
+                        <div class="w-full flex justify-between items-center mb-4">
+                            <span class="font-bold text-slate-200">Page ${index + 1}</span>
+                            ${statusHTML}
+                        </div>
+                        <button id="lecture-btn-${index}" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-900 font-bold py-2 rounded-lg transition-colors border-0 cursor-pointer" onclick="lecture_generatePage(${index})">
+                            <i class="fas fa-magic mr-1"></i> Generate Slides
+                        </button>
+                    </div>
+                `;
             });
-            const json = await res.json();
-            if (json.error) throw new Error(json.error.message);
+        }
+
+        async function lecture_generatePage(index) {
+            if (!apiKey) {
+                requestGlobalApiKey();
+                if(!apiKey) return;
+            }
             
-            let rawText = json.candidates[0].content.parts[0].text;
+            const btn = document.getElementById(`lecture-btn-${index}`);
+            
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Generating...`;
+            btn.classList.replace('bg-sky-500', 'bg-slate-600');
+            btn.classList.replace('hover:bg-sky-400', 'hover:bg-slate-500');
+            btn.classList.replace('text-slate-900', 'text-white');
             
             try {
-                rawText = rawText.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/i, "").trim();
-                return JSON.parse(rawText);
-            } catch (e) {
-                console.warn("First parse failed, trying regex extraction", e);
-                const match = rawText.match(/\{[\s\S]*\}/);
-                if (match) {
+                const base64Data = window.lectureImages[index].split(',')[1];
+                
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                
+                const prompt = `
+                    ACT AS: Senior University Professor.
+                    TASK: Exhaustive extraction of the attached presentation slide/page into 1 to 5 highly detailed presentation slides.
+                    STRICT RULES:
+                    1. EXTRACT ALL: Cover all major sections shown on this page. Generate exactly 1 to 5 slides depending on density.
+                    2. MATH: Use raw LaTeX wrapped in $ (e.g. $10^2$, $C_p$). Ensure subscripts (_) and superscripts (^) are correct.
+                    3. STANDALONE MATH: Use 'equation' layout for prominent formulas.
+                    4. TABLES: Use strict standard HTML <table> tags for tabular data.
+                    5. GRAPHS: Use 'chart' layout for data plots. Extract approximate numerical coordinates for (x,y).
+                    6. NO PROFESSOR NOTES: Use 'key_insight' field only.
+                    7. REQUIRED: You must generate slides and strictly follow the output schema.
+                `;
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/png", data: base64Data } }] }],
+                        generationConfig: { 
+                            responseMimeType: "application/json", 
+                            responseSchema: {
+                                type: "OBJECT",
+                                properties: {
+                                    slides: {
+                                        type: "ARRAY",
+                                        items: {
+                                            type: "OBJECT",
+                                            properties: {
+                                                layout: { type: "STRING", description: "Must be: title | content | equation | table | chart | diagram" },
+                                                title: { type: "STRING", description: "The title of the slide" },
+                                                bullets: { type: "ARRAY", items: { type: "STRING" }, description: "Array of bullet points for the slide content. Must be generated for all text-heavy slides." },
+                                                latex: { type: "STRING" },
+                                                table_html: { type: "STRING" },
+                                                chart_data: { 
+                                                    type: "OBJECT",
+                                                    properties: {
+                                                        type: { type: "STRING" },
+                                                        x_label: { type: "STRING" },
+                                                        y_label: { type: "STRING" },
+                                                        datasets: {
+                                                            type: "ARRAY",
+                                                            items: {
+                                                                type: "OBJECT",
+                                                                properties: {
+                                                                    label: { type: "STRING" },
+                                                                    data: {
+                                                                        type: "ARRAY",
+                                                                        items: {
+                                                                            type: "OBJECT",
+                                                                            properties: {
+                                                                                x: { type: "NUMBER" },
+                                                                                y: { type: "NUMBER" }
+                                                                            },
+                                                                            required: ["x", "y"]
+                                                                        }
+                                                                    }
+                                                                },
+                                                                required: ["label", "data"]
+                                                            }
+                                                        },
+                                                        labels: { type: "ARRAY", items: { type: "STRING" } }
+                                                    },
+                                                    required: ["type", "datasets"]
+                                                },
+                                                diagram_mermaid: { type: "STRING" },
+                                                key_insight: { type: "STRING", description: "A crucial professor note to explain the slide clearly." }
+                                            },
+                                            required: ["layout", "title", "bullets", "key_insight"]
+                                        }
+                                    }
+                                },
+                                required: ["slides"]
+                            }
+                        }
+                    })
+                });
+
+                if (!res.ok) {
+                    if(res.status === 429) throw new Error("API Rate Limit Exceeded! Please reset/change your API key at the top.");
+                    throw new Error(`API Error ${res.status}`);
+                }
+                
+                const data = await res.json();
+                let jsonStr = data.candidates[0].content.parts[0].text;
+                jsonStr = jsonStr.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+                
+                const parsed = JSON.parse(jsonStr);
+                window.lectureGeneratedSlides[index] = parsed.slides || [];
+                
+                renderLectureGrid(); 
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-redo mr-1"></i> Retry`;
+                btn.classList.replace('bg-slate-600', 'bg-red-500');
+                btn.classList.replace('hover:bg-slate-500', 'hover:bg-red-400');
+                alert(`Failed to generate Page ${index + 1}: ${err.message}`);
+            }
+        }
+
+        async function lecture_generateAll() {
+            for (let i = 0; i < window.lectureImages.length; i++) {
+                if (!window.lectureGeneratedSlides[i]) {
                     try {
-                        return JSON.parse(match[0]);
-                    } catch (innerE) {
-                        throw new Error("The AI returned malformed JSON. Please try again or with a smaller PDF.");
+                        await lecture_generatePage(i);
+                        await new Promise(r => setTimeout(r, 1000));
+                    } catch (err) {
+                        console.error("Stopping auto-generation due to error", err);
+                        break;
                     }
                 }
-                throw new Error("Could not find valid JSON in AI response.");
             }
+        }
+
+        function lecture_compile() {
+            let allSlides = [];
+            for (let i = 0; i < window.lectureImages.length; i++) {
+                if (window.lectureGeneratedSlides[i]) {
+                    allSlides = allSlides.concat(window.lectureGeneratedSlides[i]);
+                }
+            }
+            
+            if (allSlides.length === 0) {
+                alert("No slides have been generated yet! Please generate at least one page.");
+                return;
+            }
+            
+            window.currentData = { slides: allSlides };
+            document.getElementById('lecture-processing-screen').style.display = 'none';
+            document.getElementById('presentation-area').style.display = 'flex';
+            document.getElementById('export-btn').style.display = 'inline-block';
+            renderDecks(window.currentData);
         }
 
         async function renderDecks(data) {
@@ -988,24 +1060,18 @@
             }
         }
 
-        
         function resetAPIKeyGlobal() {
             localStorage.removeItem('gemini_api_key');
             apiKey = "";
-            requestGlobalApiKey();
-            if(apiKey) {
-                alert("API Key updated! You can now continue generating.");
-            }
+            alert("API Key cleared! You will be prompted for it on your next action.");
+            location.reload();
         }
 
         function requestGlobalApiKey() {
-            let newKey = prompt("Please enter your Google AI Studio API key (get it free from aistudio.google.com):");
-            if (newKey && newKey.trim() !== "") {
-                apiKey = newKey.trim();
+            apiKey = prompt("Please enter your Google AI Studio API key (get it free from aistudio.google.com):");
+            if (apiKey) {
                 localStorage.setItem('gemini_api_key', apiKey);
             }
-        }
-
         }
 
 
@@ -1179,7 +1245,7 @@
             ew_clearFile();
             
             ew_domElements.playbackSection.style.display = 'none';
-            document.getElementById('ew-processing-screen').classList.add('hidden');
+            if(document.getElementById('ew-processing-screen')) document.getElementById('ew-processing-screen').classList.add('hidden');
             ew_domElements.loadingSection.style.display = 'none';
             ew_domElements.inputSection.style.display = 'block';
             ew_domElements.errorBox.classList.add('hidden');
@@ -1392,7 +1458,7 @@
         }
 
         // --- Main Generation Flow ---
-        
+
         async function ew_startProcessing() {
             if (!ew_appState.selectedFile) return;
 
@@ -1446,7 +1512,7 @@
                             <span class="font-bold text-slate-200">Page ${index + 1}</span>
                             ${statusHTML}
                         </div>
-                        <button id="ew-btn-${index}" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1" onclick="ew_generateScene(${index})">
+                        <button id="ew-btn-${index}" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1 border-0 cursor-pointer" onclick="ew_generateScene(${index})">
                             <i data-lucide="wand-2" class="w-4 h-4"></i> Generate Scene
                         </button>
                     </div>
@@ -1553,7 +1619,6 @@
                 ew_domElements.loadingSection.style.display = 'none';
             }
         }
-
 
         function ew_updateLoadingStatus(text, activeIcon) {
             ew_domElements.statusText.innerText = text;
