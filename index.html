@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>University Lecture Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     
     <!-- External Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet" />
@@ -102,11 +105,7 @@
         .bg-dark-slide .insight-box { background: #082f49; color: #bae6fd; }
 
         /* Upload Screen */
-        #upload-screen { 
-            position: fixed; inset: 0; z-index: 100; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: var(--bg-dark); padding-top: 70px;
-        }
+        #upload-screen { width: 100%; min-height: 80vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .upload-card {
             background: var(--panel-dark); padding: 60px; border-radius: 20px;
             border: 2px dashed var(--primary); text-align: center; max-width: 700px;
@@ -127,19 +126,100 @@
         
         .chart-container { width: 100%; height: 350px; position: relative; }
         canvas { width: 100% !important; height: 100% !important; }
+    
+/* EduWeaver Styles */
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        .ew-app {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #020617; /* slate-950 */
+            color: #f1f5f9; /* slate-100 */
+        }
+
+        /* Smooth Cinematic Animations */
+        .anim-subtle-zoom {
+            will-change: transform;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            transform-style: preserve-3d;
+            animation: subtleZoom 30s linear forwards;
+        }
+
+        /* Faster zoom for 30s Reels */
+        .anim-dynamic-zoom {
+            will-change: transform;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            transform-style: preserve-3d;
+            animation: dynamicZoom 8s linear forwards;
+        }
+
+        #player-image {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            transform: translate3d(0, 0, 0);
+            image-rendering: high-quality;
+            filter: blur(0px);
+            object-fit: contain; 
+            background-color: #000;
+        }
+
+        @keyframes subtleZoom {
+            0% { transform: scale(1.0) translate3d(0,0,0); }
+            100% { transform: scale(1.05) translate3d(0,0,0); }
+        }
+
+        @keyframes dynamicZoom {
+            0% { transform: scale(1.0) translate3d(0,0,0); }
+            100% { transform: scale(1.15) translate3d(0,0,0); }
+        }
+
+        .cinematic-shadow {
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.9), 0px 4px 10px rgba(0,0,0,0.5);
+        }
+
+        /* Custom File Input Styling */
+        .upload-zone {
+            transition: all 0.3s ease;
+        }
+        .upload-zone.dragover {
+            background-color: rgba(79, 70, 229, 0.2); 
+            border-color: #818cf8; 
+            transform: scale(1.02);
+        }
+    
     </style>
 </head>
-<body>
+<body class="bg-slate-950 text-slate-100">
 
-    <div class="app-controls">
-        <div class="app-brand"><i class="fas fa-graduation-cap"></i> UniLecture AI</div>
-        <div class="btn-group">
-            <button class="btn btn-secondary" onclick="resetAPIKey()"><i class="fas fa-key"></i> Reset Key</button>
-            <button class="btn btn-secondary" onclick="resetApp()"><i class="fas fa-plus"></i> New Project</button>
-            <button id="export-btn" class="btn btn-primary" style="display:none" onclick="exportToPPTX()"><i class="fas fa-file-export"></i> Export PPTX</button>
+    <!-- Global Tab Navigation -->
+    <div class="fixed top-0 left-0 w-full h-[70px] bg-slate-900 border-b border-slate-800 flex justify-center items-center gap-4 z-[9999] shadow-md">
+        <div class="absolute left-6 flex items-center gap-3">
+            <div class="p-2 bg-sky-500/10 rounded-lg"><i class="fas fa-layer-group text-sky-400 text-xl"></i></div>
+            <span class="font-bold text-lg text-white tracking-wide">UniLecture <span class="text-sky-400">Hub</span></span>
         </div>
+        <button onclick="switchTab('app-lecture')" id="tab-btn-lecture" class="px-5 py-2 rounded-lg font-semibold text-sm transition-all bg-sky-500 text-slate-900 shadow-lg shadow-sky-500/20">
+            <i class="fas fa-file-pdf mr-2"></i> Slide Extractor
+        </button>
+        <button onclick="switchTab('app-video')" id="tab-btn-video" class="px-5 py-2 rounded-lg font-semibold text-sm transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+            <i data-lucide="film" class="w-4 h-4 inline-block mr-2 -mt-1"></i> Video Studio
+        </button>
+        <button class="absolute right-6 px-4 py-2 rounded-lg font-semibold text-sm bg-slate-800 text-white hover:bg-slate-700 transition-colors border border-slate-700 flex items-center gap-2" onclick="resetAPIKeyGlobal()">
+            <i class="fas fa-key text-sky-400"></i> Reset API Key
+        </button>
     </div>
 
+
+    
+
+    <div id="app-lecture" class="w-full pt-[70px] flex flex-col items-center">
+
+    <!-- Lecture App Header Controls -->
+    <div class="w-full flex justify-end gap-3 px-8 py-4 bg-transparent mb-2 max-w-[1280px]">
+        <button class="btn btn-secondary" onclick="resetApp()"><i class="fas fa-plus"></i> New Project</button>
+        <button id="export-btn" class="btn btn-primary" style="display:none" onclick="exportToPPTX()"><i class="fas fa-file-export"></i> Export PPTX</button>
+    </div>
     <div id="upload-screen">
         <div class="upload-card" id="drop-zone">
             <div id="scanner" class="scanner-line"></div>
@@ -157,12 +237,204 @@
 
     <div id="presentation-area"></div>
 
+    </div>
     <div class="modal-overlay" id="modal">
         <div class="modal-content">
             <h3 id="m-title">Alert</h3>
             <p id="m-body" style="color: var(--text-muted); margin-top: 10px;"></p>
             <button class="modal-close" onclick="document.getElementById('modal').style.display='none'">Dismiss</button>
         </div>
+    </div>
+
+    <!-- EduWeaver App -->
+    <div id="app-video" class="w-full hidden pt-[70px] pb-10 flex-col items-center">
+
+
+    <!-- Header -->
+    <header class="w-full max-w-4xl flex items-center gap-3 mb-8">
+        <div class="p-3 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/20">
+            <i data-lucide="presentation" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400 m-0">
+                EduWeaver
+            </h1>
+            <p class="text-slate-400 text-sm m-0" id="subtitle-text">AI Educational Video Generator</p>
+        </div>
+    </header>
+
+    <main class="w-full max-w-4xl flex flex-col gap-6 ew-app">
+
+        <!-- Input Section -->
+        <div id="input-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+            <h2 id="input-heading" class="text-xl font-semibold mb-4 text-slate-200" dir="rtl">قم برفع عرضك التقديمي</h2>
+            
+            <div class="flex flex-wrap gap-4 mb-6">
+                <!-- Language Toggle -->
+                <div class="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
+                    <i data-lucide="languages" class="w-4 h-4 text-slate-400 ml-2"></i>
+                    <button onclick="ew_setLanguage('ar-en-mix')" id="btn-lang-mix" class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-slate-400 hover:text-white border-0 bg-transparent cursor-pointer">عربي + English</button>
+                    <button onclick="ew_setLanguage('ar')" id="btn-lang-ar" class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-slate-400 hover:text-white border-0 bg-transparent cursor-pointer">العربية فقط</button>
+                    <button onclick="ew_setLanguage('en')" id="btn-lang-en" class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors bg-indigo-600 text-white border-0 cursor-pointer">English</button>
+                </div>
+
+                <!-- Video Mode Options -->
+                <div class="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800 flex-wrap">
+                    <i data-lucide="film" class="w-4 h-4 text-slate-400 ml-2"></i>
+                    <button onclick="ew_setMode('lecture')" id="btn-mode-lecture" class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors bg-indigo-600 text-white lang-txt border-0 cursor-pointer" data-ar="محاضرة تفصيلية (16:9)" data-en="Full Lecture (16:9)">محاضرة تفصيلية (16:9)</button>
+                    <button onclick="ew_setMode('reel')" id="btn-mode-reel" class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-slate-400 hover:text-white lang-txt border-0 bg-transparent cursor-pointer" data-ar="ريلز مبهر (30 ثانية)" data-en="30s Impressive Reel (9:16)">ريلز مبهر (30 ثانية)</button>
+                </div>
+            </div>
+
+            <!-- Upload Zone -->
+            <label for="file-upload" id="drop-zone-ew" class="upload-zone relative flex flex-col items-center justify-center w-full h-48 border-2 border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-950 hover:bg-slate-900 group m-0">
+                <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                    <div class="p-3 bg-indigo-500/10 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                        <i data-lucide="file-up" class="w-8 h-8 text-indigo-400"></i>
+                    </div>
+                    <p class="mb-2 text-sm text-slate-300 font-semibold m-0" id="upload-title">اضغط أو اسحب الملف هنا</p>
+                    <p class="text-xs text-slate-500 m-0" id="upload-desc">يرجى حفظ ملف الـ PowerPoint بصيغة PDF لضمان استخراج الشرائح بأعلى جودة</p>
+                </div>
+                <input id="file-upload" type="file" class="hidden" accept=".pdf,.pptx,.ppt" onchange="ew_handleFileSelect(event)" />
+            </label>
+
+            <!-- Selected File Info -->
+            <div id="file-info" class="mt-4 flex items-center justify-between p-3 bg-indigo-900/20 border border-indigo-500/30 rounded-lg hidden">
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <i data-lucide="file-text" class="w-5 h-5 text-indigo-400 flex-shrink-0"></i>
+                    <span id="file-name" class="text-sm font-medium text-slate-200 truncate"></span>
+                </div>
+                <button onclick="ew_clearFile()" class="text-slate-400 hover:text-red-400 transition-colors p-1 border-0 bg-transparent cursor-pointer">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            
+            <div class="mt-6 flex justify-end">
+                <button id="generate-btn" onclick="ew_startProcessing()" disabled class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-lg shadow-indigo-500/20 border-0 cursor-pointer">
+                    <i data-lucide="wand-2" class="w-5 h-5"></i>
+                    <span id="generate-btn-text">تحويل لفيديو تعليمي</span>
+                </button>
+            </div>
+            
+            <div id="error-box" class="mt-4 p-4 bg-red-900/30 border border-red-800/50 rounded-xl flex items-start gap-3 text-red-400 hidden" dir="rtl">
+                <i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0 mt-0.5"></i>
+                <p id="error-text" class="text-sm font-medium m-0"></p>
+            </div>
+        </div>
+
+        <!-- Loading / Exporting State -->
+        <div id="loading-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-12 shadow-xl flex flex-col items-center justify-center min-h-[400px] hidden">
+            <div class="relative mb-8">
+                <div class="absolute inset-0 bg-indigo-500 blur-xl opacity-20 rounded-full animate-pulse"></div>
+                <i data-lucide="loader-2" class="w-16 h-16 text-indigo-400 animate-spin relative z-10"></i>
+            </div>
+            <h3 id="loading-status" class="text-xl font-medium text-slate-200 mb-2 text-center m-0" dir="auto">جاري المعالجة...</h3>
+            <p id="loading-desc" class="text-slate-500 text-sm max-w-md text-center mb-8 m-0" dir="auto">
+                يقوم الذكاء الاصطناعي باستخراج الشرائح، قراءتها، وكتابة شرح تفاعلي لكل شريحة...
+            </p>
+            
+            <div id="loading-icons" class="flex gap-4 text-slate-600">
+                <i data-lucide="file-search" class="w-5 h-5" id="icon-extract"></i>
+                <i data-lucide="brain-circuit" class="w-5 h-5" id="icon-ai"></i>
+                <i data-lucide="mic" class="w-5 h-5" id="icon-audio"></i>
+            </div>
+        </div>
+
+        <!-- Playback Studio -->
+        <div id="playback-section" class="flex flex-col gap-4 hidden">
+            <div class="flex justify-between items-center px-2">
+                <h2 id="story-title" class="text-xl font-bold text-slate-200 truncate pr-4 m-0" dir="auto"></h2>
+                <div class="flex items-center gap-4">
+                    <button onclick="ew_exportVideo()" class="text-indigo-400 hover:text-indigo-300 flex items-center gap-2 text-sm transition-colors bg-indigo-500/10 px-3 py-1.5 rounded-lg border-0 cursor-pointer">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span id="export-btn-text">تصدير الفيديو</span>
+                    </button>
+                    <button onclick="ew_resetApp()" class="text-slate-400 hover:text-white flex items-center gap-2 text-sm transition-colors border-0 bg-transparent cursor-pointer">
+                        <i data-lucide="refresh-ccw" class="w-4 h-4"></i>
+                        <span id="new-story-btn-text">عرض جديد</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cinematic Canvas Container -->
+            <div id="canvas-container" class="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-slate-800 group transition-all duration-500">
+                
+                <!-- Image Wrapper (for CSS Animation) -->
+                <div id="player-image-wrapper" class="w-full h-full absolute inset-0 flex items-center justify-center bg-slate-950">
+                    <img id="player-image" src="" alt="Slide" class="w-full h-full object-contain" />
+                </div>
+                
+                <!-- Overlays -->
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-90 pointer-events-none"></div>
+
+                <!-- Controls Bar -->
+                <div class="absolute bottom-0 inset-x-0 h-16 bg-slate-950/90 backdrop-blur-md border-t border-white/10 flex items-center justify-between px-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+                    <div id="scene-counter" class="text-xs font-medium text-slate-400 tracking-wider">SLIDE 1 OF X</div>
+                    
+                    <div class="flex items-center gap-4">
+                        <button onclick="ew_prevScene()" id="btn-prev" class="text-slate-300 hover:text-white disabled:opacity-30 transition-colors border-0 bg-transparent cursor-pointer">
+                            <i data-lucide="skip-back" class="w-5 h-5 fill-current"></i>
+                        </button>
+                        
+                        <button onclick="ew_togglePlay()" class="w-10 h-10 rounded-full bg-white text-slate-950 flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-white/20 border-0 cursor-pointer">
+                            <i data-lucide="play" id="icon-play" class="w-5 h-5 fill-current ml-1"></i>
+                            <i data-lucide="pause" id="icon-pause" class="w-5 h-5 fill-current hidden"></i>
+                        </button>
+                        
+                        <button onclick="ew_nextScene()" id="btn-next" class="text-slate-300 hover:text-white disabled:opacity-30 transition-colors border-0 bg-transparent cursor-pointer">
+                            <i data-lucide="skip-forward" class="w-5 h-5 fill-current"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="w-16"></div> <!-- Spacer -->
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="absolute top-0 inset-x-0 h-1 bg-slate-800 z-20">
+                    <div id="progress-bar" class="h-full bg-indigo-500 transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Hidden Audio Element -->
+            <audio id="player-audio" onended="ew_handleAudioEnded()"></audio>
+
+            <!-- YouTube SEO Metadata Section -->
+            <div id="seo-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl mt-4">
+                <h3 class="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2 m-0" dir="auto">
+                    <i data-lucide="youtube" class="w-5 h-5 text-red-500"></i>
+                    <span id="seo-heading-text">بيانات يوتيوب المحسنة (SEO)</span>
+                </h3>
+                
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label id="seo-title-label" class="text-xs font-medium text-slate-400 m-0">عنوان الفيديو</label>
+                            <button onclick="ew_copyToClipboard('yt-title', this)" class="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 transition-colors border-0 bg-transparent cursor-pointer"><i data-lucide="copy" class="w-3 h-3"></i> <span class="copy-btn-text">نسخ</span></button>
+                        </div>
+                        <div id="yt-title" class="p-3 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-200 font-medium" dir="auto"></div>
+                    </div>
+                    
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label id="seo-desc-label" class="text-xs font-medium text-slate-400 m-0">الوصف (Description)</label>
+                            <button onclick="ew_copyToClipboard('yt-desc', this)" class="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 transition-colors border-0 bg-transparent cursor-pointer"><i data-lucide="copy" class="w-3 h-3"></i> <span class="copy-btn-text">نسخ</span></button>
+                        </div>
+                        <div id="yt-desc" class="p-3 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-300 whitespace-pre-wrap leading-relaxed" dir="auto"></div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label id="seo-tags-label" class="text-xs font-medium text-slate-400 m-0">الكلمات المفتاحية (Tags/Hashtags)</label>
+                            <button onclick="ew_copyToClipboard('yt-tags', this)" class="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 transition-colors border-0 bg-transparent cursor-pointer"><i data-lucide="copy" class="w-3 h-3"></i> <span class="copy-btn-text">نسخ</span></button>
+                        </div>
+                        <div id="yt-tags" class="p-3 bg-slate-950 border border-slate-800 rounded-lg text-sm text-indigo-400" dir="auto"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    
     </div>
 
     <script>
@@ -665,6 +937,765 @@
                 btn.disabled = false;
             }
         }
+
+/* --- EduWeaver Scripts & Shared Logic --- */
+
+        function switchTab(tabId) {
+            document.getElementById('app-lecture').style.display = tabId === 'app-lecture' ? 'flex' : 'none';
+            document.getElementById('app-video').style.display = tabId === 'app-video' ? 'flex' : 'none';
+            
+            const btnLecture = document.getElementById('tab-btn-lecture');
+            const btnVideo = document.getElementById('tab-btn-video');
+            
+            if (tabId === 'app-lecture') {
+                btnLecture.className = "px-5 py-2 rounded-lg font-semibold text-sm transition-all bg-sky-500 text-slate-900 shadow-lg shadow-sky-500/20";
+                btnVideo.className = "px-5 py-2 rounded-lg font-semibold text-sm transition-all text-slate-400 hover:text-white hover:bg-slate-800";
+            } else {
+                btnVideo.className = "px-5 py-2 rounded-lg font-semibold text-sm transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-500/20";
+                btnLecture.className = "px-5 py-2 rounded-lg font-semibold text-sm transition-all text-slate-400 hover:text-white hover:bg-slate-800";
+                // Trigger lucide icons for Eduweaver if first time
+                if(typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        }
+
+        function resetAPIKeyGlobal() {
+            localStorage.removeItem('gemini_api_key');
+            apiKey = "";
+            alert("API Key cleared! You will be prompted for it on your next action.");
+            location.reload();
+        }
+
+        function requestGlobalApiKey() {
+            apiKey = prompt("Please enter your Google AI Studio API key (get it free from aistudio.google.com):");
+            if (apiKey) {
+                localStorage.setItem('gemini_api_key', apiKey);
+            }
+        }
+
+
+        // Setup PDF.js worker
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // --- App State ---
+        let ew_appState = {
+            language: 'en', // 'ar', 'en', or 'ar-en-mix'
+            videoMode: 'lecture', // 'lecture' or 'reel'
+            selectedFile: null,
+            story: null,    
+            currentSceneIndex: 0,
+            isPlaying: false
+        };
+
+        const ew_domElements = {
+            inputSection: document.getElementById('input-section'),
+            loadingSection: document.getElementById('loading-section'),
+            playbackSection: document.getElementById('playback-section'),
+            errorBox: document.getElementById('error-box'),
+            errorText: document.getElementById('error-text'),
+            statusText: document.getElementById('loading-status'),
+            descText: document.getElementById('loading-desc'),
+            audioPlayer: document.getElementById('player-audio'),
+            playerImage: document.getElementById('player-image'),
+            playerImageWrapper: document.getElementById('player-image-wrapper'),
+            storyTitle: document.getElementById('story-title'),
+            sceneCounter: document.getElementById('scene-counter'),
+            progressBar: document.getElementById('progress-bar'),
+            iconPlay: document.getElementById('icon-play'),
+            iconPause: document.getElementById('icon-pause'),
+            btnPrev: document.getElementById('btn-prev'),
+            btnNext: document.getElementById('btn-next'),
+            canvasContainer: document.getElementById('canvas-container'),
+            generateBtn: document.getElementById('generate-btn'),
+            fileInfo: document.getElementById('file-info'),
+            fileName: document.getElementById('file-name'),
+            dropZone: document.getElementById('drop-zone-ew')
+        };
+
+        // --- Initialization ---
+        function ew_init() {
+            ew_updateUITexts();
+            ew_setupDragAndDrop();
+        }
+
+        function ew_setupDragAndDrop() {
+            const dropZone = ew_domElements.dropZone;
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+            });
+
+            dropZone.addEventListener('drop', ew_handleDrop, false);
+        }
+
+        function ew_handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files && files.length > 0) {
+                ew_processFileSelection(files[0]);
+            }
+        }
+
+        function ew_handleFileSelect(event) {
+            if (event.target.files && event.target.files.length > 0) {
+                ew_processFileSelection(event.target.files[0]);
+            }
+        }
+
+        function ew_processFileSelection(file) {
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                const isAr = ew_appState.language === 'ar' || ew_appState.language === 'ar-en-mix';
+                ew_showError(isAr ? 
+                    "لضمان استخراج الشرائح بأعلى جودة عبر المتصفح، يرجى فتح العرض في برنامج PowerPoint واختيار 'Save As PDF' ثم رفع ملف الـ PDF هنا." : 
+                    "To extract slides directly in your browser with high quality, please 'Save As PDF' in PowerPoint and upload the PDF file here.");
+                ew_clearFile();
+                return;
+            }
+            if (!apiKey) {
+                requestGlobalApiKey();
+                if (!apiKey) {
+                    document.getElementById('file-upload').value = ''; 
+                    return;
+                }
+            }
+
+            ew_appState.selectedFile = file;
+            ew_domElements.fileName.innerText = file.name;
+            ew_domElements.fileInfo.classList.remove('hidden');
+            ew_domElements.generateBtn.disabled = false;
+            ew_domElements.errorBox.classList.add('hidden');
+        }
+
+        function ew_clearFile() {
+            ew_appState.selectedFile = null;
+            document.getElementById('file-upload').value = '';
+            ew_domElements.fileInfo.classList.add('hidden');
+            ew_domElements.generateBtn.disabled = true;
+        }
+
+        // --- UI Interactions ---
+        function ew_setLanguage(lang) {
+            ew_appState.language = lang;
+            document.getElementById('btn-lang-mix').className = `px-3 py-1.5 rounded-md text-sm font-medium transition-colors border-0 cursor-pointer ${lang === 'ar-en-mix' ? 'bg-indigo-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`;
+            document.getElementById('btn-lang-ar').className = `px-3 py-1.5 rounded-md text-sm font-medium transition-colors border-0 cursor-pointer ${lang === 'ar' ? 'bg-indigo-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`;
+            document.getElementById('btn-lang-en').className = `px-3 py-1.5 rounded-md text-sm font-medium transition-colors border-0 cursor-pointer ${lang === 'en' ? 'bg-indigo-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`;
+            ew_updateUITexts();
+        }
+
+        function ew_setMode(mode) {
+            ew_appState.videoMode = mode;
+            document.getElementById('btn-mode-lecture').className = `px-3 py-1.5 rounded-md text-sm font-medium transition-colors lang-txt border-0 cursor-pointer ${mode === 'lecture' ? 'bg-indigo-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`;
+            document.getElementById('btn-mode-reel').className = `px-3 py-1.5 rounded-md text-sm font-medium transition-colors lang-txt border-0 cursor-pointer ${mode === 'reel' ? 'bg-indigo-600 text-white' : 'bg-transparent text-slate-400 hover:text-white'}`;
+        }
+
+        function ew_updateUITexts() {
+            const isAr = ew_appState.language === 'ar' || ew_appState.language === 'ar-en-mix';
+            
+            document.getElementById('input-heading').innerText = isAr ? 'قم برفع عرضك التقديمي' : "Upload Your Presentation";
+            document.getElementById('input-heading').dir = isAr ? 'rtl' : 'ltr';
+            
+            document.getElementById('upload-title').innerText = isAr ? 'اضغط أو اسحب الملف هنا' : "Click or drag file here";
+            document.getElementById('upload-desc').innerText = isAr ? 'يرجى حفظ ملف الـ PowerPoint بصيغة PDF لضمان استخراج الشرائح بأعلى جودة' : "Please save your PowerPoint as PDF for high-quality browser extraction";
+            
+            document.getElementById('generate-btn-text').innerText = isAr ? 'تحويل لفيديو تعليمي' : 'Generate Educational Video';
+            ew_domElements.errorBox.dir = isAr ? 'rtl' : 'ltr';
+
+            document.querySelectorAll('.lang-txt').forEach(el => {
+                el.innerText = isAr ? el.getAttribute('data-ar') : el.getAttribute('data-en');
+            });
+
+            document.getElementById('export-btn-text').innerText = isAr ? 'تصدير الفيديو' : 'Export Video';
+            document.getElementById('new-story-btn-text').innerText = isAr ? 'عرض جديد' : 'New Presentation';
+
+            document.getElementById('seo-heading-text').innerText = isAr ? 'بيانات يوتيوب المحسنة (SEO)' : 'YouTube SEO Metadata';
+            document.getElementById('seo-title-label').innerText = isAr ? 'عنوان الفيديو' : 'Video Title';
+            document.getElementById('seo-desc-label').innerText = isAr ? 'الوصف (Description)' : 'Description';
+            document.getElementById('seo-tags-label').innerText = isAr ? 'الكلمات المفتاحية (Tags/Hashtags)' : 'Tags/Hashtags';
+            document.querySelectorAll('.copy-btn-text').forEach(el => el.innerText = isAr ? 'نسخ' : 'Copy');
+            
+            document.getElementById('subtitle-text').innerText = isAr ? 'مولد فيديوهات تعليمية بالذكاء الاصطناعي' : 'AI Educational Video Generator';
+        }
+
+        function ew_showError(msg) {
+            ew_domElements.errorBox.classList.remove('hidden');
+            ew_domElements.errorText.innerText = msg;
+        }
+
+        function ew_resetApp() {
+            ew_appState.story = null;
+            ew_appState.currentSceneIndex = 0;
+            ew_appState.isPlaying = false;
+            ew_domElements.audioPlayer.pause();
+            
+            ew_clearFile();
+            
+            ew_domElements.playbackSection.style.display = 'none';
+            ew_domElements.loadingSection.style.display = 'none';
+            ew_domElements.inputSection.style.display = 'block';
+            ew_domElements.errorBox.classList.add('hidden');
+        }
+
+        function ew_createWavUrl(base64Pcm, sampleRate = 24000) {
+            const binaryString = atob(base64Pcm);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            const dataLength = bytes.length;
+            const buffer = new ArrayBuffer(44 + dataLength);
+            const view = new DataView(buffer);
+
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) { view.setUint8(offset + i, string.charCodeAt(i)); }
+            };
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + dataLength, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, dataLength, true);
+
+            const pcmData = new Uint8Array(buffer, 44);
+            pcmData.set(bytes);
+
+            const blob = new Blob([buffer], { type: 'audio/wav' });
+            return URL.createObjectURL(blob);
+        }
+
+        function ew_copyToClipboard(elementId, btnElement) {
+            const text = document.getElementById(elementId).innerText;
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                const originalHTML = btnElement.innerHTML;
+                btnElement.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> <span class="copy-btn-text">${ew_appState.language === 'ar' || ew_appState.language === 'ar-en-mix' ? 'تم النسخ!' : 'Copied!'}</span>`;
+                lucide.createIcons();
+                setTimeout(() => {
+                    btnElement.innerHTML = originalHTML;
+                    lucide.createIcons();
+                }, 2000);
+            } catch (err) {}
+            document.body.removeChild(textArea);
+        }
+
+        async function ew_withRetry(fn, retries = 3) {
+            const delays = [2000, 4000, 8000];
+            for (let i = 0; i < retries; i++) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    console.warn(`Retry ${i+1}/${retries} failed:`, error.message);
+                    if (i === retries - 1) throw error;
+                    await new Promise(res => setTimeout(res, delays[i]));
+                }
+            }
+        }
+
+        // --- Core PDF Processing ---
+        async function ew_extractSlidesFromPDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+            const numPages = pdf.numPages;
+            const images = [];
+
+            for (let i = 1; i <= numPages; i++) {
+                const page = await pdf.getPage(i);
+                // Render at a high scale for 1080p equivalent quality
+                const viewport = page.getViewport({scale: 2.5}); 
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+
+                await page.render({canvasContext: ctx, viewport: viewport}).promise;
+                images.push(canvas.toDataURL('image/png'));
+            }
+            return images;
+        }
+
+        // --- API Calls ---
+        async function ew_apiAnalyzeSlide(base64Image, lang, slideIndex, totalSlides, previousNarrations = [], videoMode, targetWords) {
+            let languageInstruction = "";
+            if (lang === 'ar') {
+                languageInstruction = "The narration MUST be written entirely in Arabic.";
+            } else if (lang === 'en') {
+                languageInstruction = "The narration MUST be written entirely in English.";
+            } else {
+                languageInstruction = "The narration MUST be written primarily in Arabic, but you MUST keep all scientific, technical, and key concepts in English. This is a mixed Arabic-English explanation for Arab university students.";
+            }
+
+            let historyContext = "";
+            if (previousNarrations.length > 0) {
+                historyContext = `\n\nPREVIOUS SLIDES CONTEXT (Strictly avoid repeating any real-world examples, analogies, or phrases used here):\n${previousNarrations.map((n, idx) => `Slide ${idx+1}: ${n}`).join('\n')}`;
+            }
+
+            let prompt = "";
+
+            if (videoMode === 'reel') {
+                prompt = `You are a viral social media content creator and educator. Analyze this presentation slide (Slide ${slideIndex+1} of ${totalSlides}). Write a fast-paced, highly energetic voiceover script for this slide to be used in a 30-second impressive social media reel.
+                Crucial instructions:
+                1. Hook the viewer immediately. Focus ONLY on the most impressive, mind-blowing, or essential scientific fact from this slide.
+                2. Keep it EXTREMELY concise. You MUST write EXACTLY around ${targetWords} words. Do not exceed this length!
+                3. Maintain a hype, engaging, and professional tone suitable for TikTok/Instagram Reels. No repetitive hooks.
+                ${languageInstruction}${historyContext}\n\nReturn ONLY the narration text without any formatting, quotes, or markdown.`;
+            } else {
+                prompt = `You are an engaging, energetic, and highly interactive professor. Analyze this presentation slide (Slide ${slideIndex+1} of ${totalSlides}). Write a captivating voiceover script explaining the core scientific content of this slide to your students.
+                Crucial instructions:
+                1. Focus deeply on the core scientific and technical concepts. Keep the explanation clear and easy to understand.
+                2. If there are any equations (math, physics, chemistry, etc.) on the slide, you MUST explain them clearly and step-by-step. Do NOT skip over equations.
+                3. Minimize the use of real-world examples. Rely primarily on the scientific facts presented. If you must use an analogy for clarity, ensure it is extremely brief, 100% unique, and NOT repeated from previous slides.
+                4. Make it highly interactive, but STRICTLY AVOID repetitive phrases, cliches, or predictable hooks like 'يا شباب' (hey guys), 'تخيلوا' (imagine), 'دعونا نتخيل', 'Hey guys', or 'Imagine'. Vary your vocabulary and sentence starters completely from slide to slide.
+                5. Keep the narration concise and focused, roughly 3 to 5 sentences depending on the complexity of the slide.
+                ${languageInstruction}${historyContext}\n\nReturn ONLY the narration text without any formatting, quotes, or markdown.`;
+            }
+
+            const base64Data = base64Image.split(',')[1];
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            { inlineData: { mimeType: "image/png", data: base64Data } }
+                        ]
+                    }],
+                    systemInstruction: { parts: [{ text: "You are an expert educational speaker. Output plain text only. No introductory phrases." }] }
+                })
+            });
+            
+            if (!response.ok) throw new Error("Failed to analyze slide");
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+        }
+
+        async function ew_apiGenerateMetadata(allScripts, lang, videoMode) {
+            let langText = lang === 'en' ? "English" : (lang === 'ar' ? "Arabic" : "Arabic with English scientific terms");
+            const scriptText = allScripts.join(" ");
+            const formatContext = videoMode === 'reel' ? "YouTube Short / Reel" : "YouTube Educational Video";
+            
+            const prompt = `Based on the following lecture transcript, generate highly engaging, SEO-optimized metadata for a ${formatContext} to attract students. Language MUST be ${langText}.
+            
+            Transcript: ${scriptText}`;
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    systemInstruction: { parts: [{ text: "Output valid JSON only." }] },
+                    generationConfig: { 
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                title: { type: "STRING", description: "Catchy educational video title" },
+                                description: { type: "STRING", description: "Detailed description with emojis" },
+                                tags: { type: "STRING", description: "Comma separated hashtags" }
+                            },
+                            required: ["title", "description", "tags"]
+                        }
+                    }
+                })
+            });
+
+            if (!response.ok) throw new Error("Metadata generation failed");
+            const data = await response.json();
+            return JSON.parse(data.candidates[0].content.parts[0].text);
+        }
+
+        async function ew_apiGenerateAudio(text) {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: text }] }],
+                    generationConfig: { 
+                        responseModalities: ["AUDIO"],
+                        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } 
+                    },
+                    model: "gemini-2.5-flash-preview-tts"
+                })
+            });
+
+            if (!response.ok) throw new Error("TTS generation failed");
+            const data = await response.json();
+            const base64Pcm = data.candidates[0].content.parts[0].inlineData.data;
+            return ew_createWavUrl(base64Pcm, 24000);
+        }
+
+        // --- Main Generation Flow ---
+        async function ew_startProcessing() {
+            if (!ew_appState.selectedFile) return;
+
+            ew_domElements.inputSection.style.display = 'none';
+            ew_domElements.loadingSection.style.display = 'flex';
+            ew_domElements.playbackSection.style.display = 'none';
+            ew_domElements.errorBox.classList.add('hidden');
+            
+            const isAr = ew_appState.language === 'ar' || ew_appState.language === 'ar-en-mix';
+            ew_appState.currentSceneIndex = 0;
+            ew_appState.isPlaying = false;
+            
+            try {
+                // Step 1: Extract Images
+                ew_updateLoadingStatus(isAr ? "جاري استخراج الشرائح من الملف..." : "Extracting slides from document...", 'extract');
+                const slideImages = await ew_extractSlidesFromPDF(ew_appState.selectedFile);
+                
+                if (slideImages.length === 0) throw new Error(isAr ? "لم يتم العثور على شرائح في الملف." : "No slides found in the document.");
+
+                // If Reel mode, limit slides to a maximum of 6 to ensure fast pacing (30s / 6 = 5s per slide)
+                let slideImagesToProcess = slideImages;
+                if (ew_appState.videoMode === 'reel' && slideImages.length > 6) {
+                    slideImagesToProcess = [];
+                    const step = (slideImages.length - 1) / 5; 
+                    for(let i=0; i<6; i++) {
+                        slideImagesToProcess.push(slideImages[Math.round(i * step)]);
+                    }
+                }
+
+                const totalSlides = slideImagesToProcess.length;
+                // Target word count for Reel: ~70 words total for a 30s audio.
+                const targetWordsPerSlide = ew_appState.videoMode === 'reel' ? Math.floor(70 / totalSlides) : 0;
+
+                const populatedScenes = [];
+                const allNarrations = [];
+
+                // Step 2: Analyze & Generate TTS per slide
+                for (let i = 0; i < totalSlides; i++) {
+                    const base64Img = slideImagesToProcess[i];
+                    
+                    ew_updateLoadingStatus(
+                        isAr ? `جاري تحليل شريحة ${i + 1} من ${totalSlides} وكتابة الشرح...` : `Analyzing slide ${i + 1} of ${totalSlides}...`, 
+                        'ai'
+                    );
+                    
+                    const narration = await ew_withRetry(() => ew_apiAnalyzeSlide(base64Img, ew_appState.language, i, totalSlides, allNarrations, ew_appState.videoMode, targetWordsPerSlide));
+                    allNarrations.push(narration);
+
+                    ew_updateLoadingStatus(
+                        isAr ? `جاري تسجيل الصوت للشريحة ${i + 1}...` : `Recording voiceover for slide ${i + 1}...`, 
+                        'audio'
+                    );
+                    const audioUrl = await ew_withRetry(() => ew_apiGenerateAudio(narration));
+
+                    // Use faster dynamic zoom for reels
+                    const animationToUse = ew_appState.videoMode === 'reel' ? 'anim-dynamic-zoom' : 'anim-subtle-zoom';
+
+                    populatedScenes.push({
+                        imageUrl: base64Img,
+                        narration: narration,
+                        audioUrl: audioUrl,
+                        animationClass: animationToUse 
+                    });
+                }
+
+                // Step 3: Generate SEO Metadata
+                ew_updateLoadingStatus(isAr ? "جاري تحسين بيانات النشر..." : "Generating YouTube Metadata...", 'ai');
+                const metadata = await ew_withRetry(() => ew_apiGenerateMetadata(allNarrations, ew_appState.language, ew_appState.videoMode));
+
+                ew_appState.story = {
+                    title: metadata.title,
+                    scenes: populatedScenes,
+                    youtubeMetadata: metadata
+                };
+
+                ew_startPlayback();
+
+            } catch (err) {
+                console.error("Processing Error:", err);
+                ew_domElements.loadingSection.style.display = 'none';
+                ew_domElements.inputSection.style.display = 'block';
+                ew_showError((isAr ? "حدث خطأ أثناء المعالجة: " : "An error occurred: ") + err.message);
+            }
+        }
+
+        function ew_updateLoadingStatus(text, activeIcon) {
+            ew_domElements.statusText.innerText = text;
+            document.getElementById('icon-extract').classList.remove('text-indigo-400', 'animate-pulse');
+            document.getElementById('icon-ai').classList.remove('text-indigo-400', 'animate-pulse');
+            document.getElementById('icon-audio').classList.remove('text-indigo-400', 'animate-pulse');
+            
+            if(activeIcon) {
+                document.getElementById(`icon-${activeIcon}`).classList.add('text-indigo-400', 'animate-pulse');
+            }
+        }
+
+        // --- Playback Logic ---
+        function ew_startPlayback() {
+            ew_domElements.loadingSection.style.display = 'none';
+            ew_domElements.playbackSection.style.display = 'flex';
+            ew_domElements.storyTitle.innerText = ew_appState.story.title;
+            
+            if (ew_appState.story.youtubeMetadata) {
+                document.getElementById('yt-title').innerText = ew_appState.story.youtubeMetadata.title;
+                document.getElementById('yt-desc').innerText = ew_appState.story.youtubeMetadata.description;
+                document.getElementById('yt-tags').innerText = ew_appState.story.youtubeMetadata.tags;
+            }
+
+            if (ew_appState.videoMode === 'reel') {
+                ew_domElements.canvasContainer.classList.remove('aspect-video', 'w-full');
+                ew_domElements.canvasContainer.classList.add('aspect-[9/16]', 'max-w-[400px]', 'mx-auto');
+                ew_domElements.playerImage.classList.add('object-contain');
+            } else {
+                ew_domElements.canvasContainer.classList.add('aspect-video', 'w-full');
+                ew_domElements.canvasContainer.classList.remove('aspect-[9/16]', 'max-w-[400px]', 'mx-auto');
+            }
+
+            ew_renderCurrentScene();
+            ew_togglePlay(true);
+        }
+
+        function ew_renderCurrentScene() {
+            if (!ew_appState.story) return;
+            const scene = ew_appState.story.scenes[ew_appState.currentSceneIndex];
+            
+            ew_domElements.playerImage.src = scene.imageUrl;
+            ew_domElements.sceneCounter.innerText = `SLIDE ${ew_appState.currentSceneIndex + 1} OF ${ew_appState.story.scenes.length}`;
+            ew_domElements.progressBar.style.width = `${((ew_appState.currentSceneIndex + 1) / ew_appState.story.scenes.length) * 100}%`;
+            
+            ew_domElements.btnPrev.disabled = ew_appState.currentSceneIndex === 0;
+            ew_domElements.btnNext.disabled = ew_appState.currentSceneIndex === ew_appState.story.scenes.length - 1;
+
+            ew_domElements.playerImageWrapper.className = "w-full h-full absolute inset-0 flex items-center justify-center bg-slate-950";
+            setTimeout(() => {
+                if (ew_appState.isPlaying) ew_domElements.playerImageWrapper.classList.add(scene.animationClass);
+            }, 50);
+
+            ew_domElements.audioPlayer.src = scene.audioUrl;
+            if (ew_appState.isPlaying) {
+                ew_domElements.audioPlayer.play().catch(e => console.error("Audio playback blocked", e));
+            }
+        }
+
+        function ew_togglePlay(forceState) {
+            ew_appState.isPlaying = forceState !== undefined ? forceState : !ew_appState.isPlaying;
+            
+            if (ew_appState.isPlaying) {
+                ew_domElements.iconPlay.classList.add('hidden');
+                ew_domElements.iconPause.classList.remove('hidden');
+                ew_domElements.audioPlayer.play().catch(e => console.error(e));
+                
+                const scene = ew_appState.story.scenes[ew_appState.currentSceneIndex];
+                ew_domElements.playerImageWrapper.classList.add(scene.animationClass);
+            } else {
+                ew_domElements.iconPlay.classList.remove('hidden');
+                ew_domElements.iconPause.classList.add('hidden');
+                ew_domElements.audioPlayer.pause();
+                
+                ew_domElements.playerImageWrapper.className = "w-full h-full absolute inset-0 flex items-center justify-center bg-slate-950";
+            }
+        }
+
+        function ew_handleAudioEnded() {
+            if (ew_appState.currentSceneIndex < ew_appState.story.scenes.length - 1) {
+                ew_appState.currentSceneIndex++;
+                ew_renderCurrentScene();
+            } else {
+                ew_togglePlay(false);
+            }
+        }
+
+        function ew_nextScene() {
+            if (ew_appState.currentSceneIndex < ew_appState.story.scenes.length - 1) {
+                ew_appState.currentSceneIndex++;
+                ew_renderCurrentScene();
+            }
+        }
+
+        function ew_prevScene() {
+            if (ew_appState.currentSceneIndex > 0) {
+                ew_appState.currentSceneIndex--;
+                ew_renderCurrentScene();
+            }
+        }
+
+        // --- Export Video Logic ---
+        async function ew_exportVideo() {
+            ew_togglePlay(false);
+            
+            ew_domElements.playbackSection.style.display = 'none';
+            ew_domElements.loadingSection.style.display = 'flex';
+            
+            const isAr = ew_appState.language === 'ar' || ew_appState.language === 'ar-en-mix';
+            ew_domElements.descText.innerText = isAr 
+                ? "نقوم الآن بتصدير الفيديو بجودة عالية... يرجى عدم إغلاق هذه الصفحة." 
+                : "Rendering presentation video. Please keep this tab open.";
+
+            try {
+                const canvas = document.createElement('canvas');
+                const isReel = ew_appState.videoMode === 'reel';
+                canvas.width = isReel ? 720 : 1280;
+                canvas.height = isReel ? 1280 : 720; 
+                const ctx = canvas.getContext('2d');
+
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const dest = audioCtx.createMediaStreamDestination();
+                if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+                const videoStream = canvas.captureStream(60); 
+                const combinedStream = new MediaStream([
+                    ...videoStream.getVideoTracks(),
+                    ...dest.stream.getAudioTracks()
+                ]);
+
+                let options = { mimeType: 'video/webm; codecs=vp9' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = { mimeType: 'video/webm' };
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) options = {}; 
+                }
+
+                const recorder = new MediaRecorder(combinedStream, options);
+                const chunks = [];
+                recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+                const videoBlobPromise = new Promise(resolve => {
+                    recorder.onstop = () => resolve(new Blob(chunks, { type: options.mimeType || 'video/webm' }));
+                });
+
+                recorder.start();
+
+                for (let i = 0; i < ew_appState.story.scenes.length; i++) {
+                    ew_updateLoadingStatus(
+                        isAr ? `جاري تصدير الشريحة ${i + 1} من ${ew_appState.story.scenes.length}...` : `Rendering slide ${i + 1} of ${ew_appState.story.scenes.length}...`,
+                        null
+                    );
+                    
+                    const scene = ew_appState.story.scenes[i];
+
+                    const img = new Image();
+                    img.crossOrigin = "anonymous";
+                    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = scene.imageUrl; });
+
+                    const audioBuffer = await fetch(scene.audioUrl)
+                        .then(r => r.arrayBuffer())
+                        .then(buf => audioCtx.decodeAudioData(buf));
+
+                    const source = audioCtx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(dest);
+
+                    const duration = audioBuffer.duration + 0.5; // Padding
+                    const startTime = performance.now();
+
+                    source.start(0);
+
+                    await new Promise(resolve => {
+                        const renderFrame = () => {
+                            const now = performance.now();
+                            const elapsed = (now - startTime) / 1000;
+                            
+                            if (elapsed >= duration) {
+                                resolve();
+                                return;
+                            }
+
+                            // Dynamic zoom scaling based on video mode
+                            let scaleMultiplier = isReel ? 0.005 : 0.002;
+                            let scale = 1.0 + (elapsed * scaleMultiplier); 
+                            
+                            ctx.save();
+                            ctx.fillStyle = '#0a0a0a';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            
+                            ctx.imageSmoothingEnabled = true;
+                            ctx.imageSmoothingQuality = 'high';
+                            
+                            ctx.translate(canvas.width / 2, canvas.height / 2);
+                            ctx.scale(scale, scale);
+                            
+                            const imgRatio = img.width / img.height;
+                            const canvasRatio = canvas.width / canvas.height;
+                            let drawWidth, drawHeight;
+                            
+                            // 95% of area to leave slight margin
+                            const targetWidth = canvas.width * 0.95;
+                            const targetHeight = canvas.height * 0.95;
+
+                            if (imgRatio > canvasRatio) {
+                                drawWidth = targetWidth;
+                                drawHeight = targetWidth / imgRatio;
+                            } else {
+                                drawHeight = targetHeight;
+                                drawWidth = targetHeight * imgRatio;
+                            }
+                            
+                            ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+                            ctx.restore();
+
+                            setTimeout(renderFrame, 1000 / 60);
+                        };
+                        renderFrame();
+                    });
+                    
+                    source.stop();
+                }
+
+                recorder.stop();
+                ew_updateLoadingStatus(isAr ? "جاري تجهيز الملف للتحميل..." : "Preparing file for download...", null);
+                
+                const blob = await videoBlobPromise;
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `${ew_appState.story.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_lecture.webm`;
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
+
+                ew_domElements.loadingSection.style.display = 'none';
+                ew_domElements.playbackSection.style.display = 'flex';
+
+            } catch (err) {
+                console.error("Export failed:", err);
+                alert(isAr ? "فشل تصدير الفيديو. يرجى المحاولة مرة أخرى." : "Failed to export video. Please try again.");
+                ew_domElements.loadingSection.style.display = 'none';
+                ew_domElements.playbackSection.style.display = 'flex';
+            }
+        }
+
+        // Delay init to allow DOM fully parse
+        setTimeout(() => {
+            ew_init();
+        }, 100);
+
+    
     </script>
 </body>
 </html>
