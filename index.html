@@ -290,8 +290,8 @@
                                         type: "OBJECT",
                                         properties: {
                                             layout: { type: "STRING", description: "Must be: title | content | equation | table | chart | diagram" },
-                                            title: { type: "STRING" },
-                                            bullets: { type: "ARRAY", items: { type: "STRING" } },
+                                            title: { type: "STRING", description: "The title of the slide" },
+                                            bullets: { type: "ARRAY", items: { type: "STRING" }, description: "Array of bullet points for the slide content. Must be generated for all text-heavy slides." },
                                             latex: { type: "STRING" },
                                             table_html: { type: "STRING" },
                                             chart_data: { 
@@ -314,20 +314,25 @@
                                                                         properties: {
                                                                             x: { type: "NUMBER" },
                                                                             y: { type: "NUMBER" }
-                                                                        }
+                                                                        },
+                                                                        required: ["x", "y"]
                                                                     }
                                                                 }
-                                                            }
+                                                            },
+                                                            required: ["label", "data"]
                                                         }
                                                     }
-                                                }
+                                                },
+                                                required: ["type", "datasets"]
                                             },
                                             mermaid_code: { type: "STRING" },
-                                            key_insight: { type: "STRING" }
-                                        }
+                                            key_insight: { type: "STRING", description: "Explanatory insight for students." }
+                                        },
+                                        required: ["layout", "title", "bullets"]
                                     }
                                 }
-                            }
+                            },
+                            required: ["slides"]
                         },
                         maxOutputTokens: 8192,
                         temperature: 0.2
