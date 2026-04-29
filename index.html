@@ -590,7 +590,7 @@
                     TASK: Exhaustive extraction of the attached presentation slide/page into 1 to 5 highly detailed presentation slides.
                     STRICT RULES:
                     1. EXTRACT ALL: Cover all major sections shown on this page. Generate exactly 1 to 5 slides depending on density.
-                    2. MATH: Use raw LaTeX wrapped in $ (e.g. $10^2$, $C_p$). Ensure subscripts (_) and superscripts (^) are correct.
+                    2. MATH: For equations, use the `latex` field and write raw LaTeX without $ signs. For inline math in bullets, wrap in $.
                     3. STANDALONE MATH: Use 'equation' layout for prominent formulas.
                     4. TABLES: Use strict standard HTML <table> tags for tabular data.
                     5. GRAPHS: Use 'chart' layout for data plots. Extract approximate numerical coordinates for (x,y).
@@ -616,7 +616,7 @@
                                                 layout: { type: "STRING", description: "Must be: title | content | equation | table | chart | diagram" },
                                                 title: { type: "STRING", description: "The title of the slide" },
                                                 bullets: { type: "ARRAY", items: { type: "STRING" }, description: "Array of bullet points for the slide content. Must be generated for all text-heavy slides." },
-                                                latex: { type: "STRING" },
+                                                latex: { type: "STRING", description: "Raw LaTeX equation string without formatting or dollars." },
                                                 table_html: { type: "STRING" },
                                                 chart_data: { 
                                                     type: "OBJECT",
@@ -624,6 +624,7 @@
                                                         type: { type: "STRING" },
                                                         x_label: { type: "STRING" },
                                                         y_label: { type: "STRING" },
+                                                        y_scale: { type: "STRING" },
                                                         datasets: {
                                                             type: "ARRAY",
                                                             items: {
@@ -649,7 +650,7 @@
                                                     },
                                                     required: ["type", "datasets"]
                                                 },
-                                                diagram_mermaid: { type: "STRING" },
+                                                mermaid_code: { type: "STRING", description: "Mermaid.js diagram syntax" },
                                                 key_insight: { type: "STRING", description: "A crucial professor note to explain the slide clearly." }
                                             },
                                             required: ["layout", "title", "bullets", "key_insight"]
@@ -1063,8 +1064,10 @@
         function resetAPIKeyGlobal() {
             localStorage.removeItem('gemini_api_key');
             apiKey = "";
-            alert("API Key cleared! You will be prompted for it on your next action.");
-            location.reload();
+            requestGlobalApiKey();
+            if(apiKey) {
+                alert("API Key updated! You can now continue generating.");
+            }
         }
 
         function requestGlobalApiKey() {
