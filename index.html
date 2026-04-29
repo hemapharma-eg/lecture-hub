@@ -248,30 +248,13 @@
                 ACT AS: Senior University Professor.
                 TASK: Exhaustive extraction of the attached PDF into a structured slide deck.
                 STRICT RULES:
-                1. EXTRACT ALL: Cover all major sections. If the PDF is technical, generate 15-30 slides.
+                1. EXTRACT ALL: Cover all major sections. Generate between 10 to 12 slides maximum to prevent output truncation.
                 2. MATH: Use raw LaTeX wrapped in $ (e.g. $10^2$, $C_p$). Ensure subscripts (_) and superscripts (^) are correct.
                 3. STANDALONE MATH: Use 'equation' layout for prominent formulas.
                 4. TABLES: Use strict standard HTML <table> tags for tabular data.
                 5. GRAPHS: Use 'chart' layout for data plots. Extract approximate numerical coordinates for (x,y).
                 6. NO PROFESSOR NOTES: Use 'key_insight' field only.
                 7. RESPONSE FORMAT: Return ONLY a valid JSON object. Do not include extra text or markdown code blocks.
-
-                JSON SCHEMA:
-                { "slides": [ {
-                    "layout": "title | content | equation | table | chart | diagram",
-                    "title": "Slide Title",
-                    "bullets": ["Point 1 with $x^2$", "Point 2"],
-                    "latex": "Full formula here",
-                    "table_html": "<table>...</table>",
-                    "chart_data": { 
-                        "type": "line", 
-                        "x_label": "X Label", 
-                        "y_label": "Y Label", 
-                        "y_scale": "linear | logarithmic", 
-                        "datasets": [{"label": "Series Name", "data": [{"x":0,"y":100}, {"x":10, "y":1}]}] 
-                    },
-                    "key_insight": "Explanatory insight for students."
-                } ] }
             `;
 
             const res = await fetch(url, {
@@ -345,7 +328,7 @@
             let rawText = json.candidates[0].content.parts[0].text;
             
             try {
-                rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+                rawText = rawText.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/i, "").trim();
                 return JSON.parse(rawText);
             } catch (e) {
                 console.warn("First parse failed, trying regex extraction", e);
