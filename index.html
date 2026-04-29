@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>University Lecture Generator</title>
+    
+    <!-- External Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    
+    <!-- KaTeX for Math -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Visual Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/libs/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary: #38bdf8;
+            --bg-dark: #0f172a;
+            --panel-dark: #1e293b;
+            --text-light: #f8fafc;
+            --text-muted: #cbd5e1;
+        }
+
+        * { box-sizing: border-box; }
+        body { 
+            margin: 0; padding: 0; 
+            background-color: var(--bg-dark); 
+            color: var(--text-light);
+            display: flex; flex-direction: column; align-items: center; 
+            min-height: 100vh;
+            font-family: "DM Sans", sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Nav Header */
+        .app-controls {
+            position: fixed; top: 0; left: 0; width: 100%; height: 70px;
+            background-color: var(--panel-dark); padding: 0 30px;
+            display: flex; justify-content: space-between; align-items: center; 
+            z-index: 999; border-bottom: 1px solid #334155;
+        }
+        .app-brand { font-weight: 700; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+        .app-brand i { color: var(--primary); }
+
+        .btn-group { display: flex; gap: 12px; }
+        .btn { font-weight: 600; font-size: 14px; padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+        .btn-primary { background-color: var(--primary); color: var(--bg-dark); }
+        .btn-secondary { background-color: #334155; color: white; }
+
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-content { background: var(--panel-dark); padding: 40px; border-radius: 12px; max-width: 450px; text-align: center; border: 1px solid #334155; }
+        .modal-close { background: var(--primary); border: none; padding: 10px 25px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 20px; width: 100%; }
+
+        /* Slide Container */
+        .slide-container {
+            width: 1280px; height: 720px; background-color: #f8fafc;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); overflow: hidden; position: relative;
+            display: flex; flex-direction: column; padding: 50px 70px; color: #1e293b;
+            margin-bottom: 50px; flex-shrink: 0;
+        }
+        .slide-container::before {
+            content: ''; position: absolute; inset: 0;
+            background-image: linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px);
+            background-size: 40px 40px; opacity: 0.3; pointer-events: none;
+        }
+        .bg-dark-slide { background-color: #0f172a; color: #f8fafc; }
+
+        /* Typography */
+        h1, h2, h3 { font-family: "Merriweather", serif; margin: 0; }
+        .slide-title { font-size: 42px; margin-bottom: 25px; border-bottom: 3px solid var(--primary); padding-bottom: 10px; width: 100%; position: relative; z-index: 2; }
+        
+        .content-area { flex-grow: 1; display: flex; flex-direction: column; position: relative; z-index: 2; min-height: 0; }
+        .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; height: 100%; align-items: center; min-height: 400px; }
+        
+        .content-list ul { list-style: none; padding: 0; margin: 0; }
+        .content-list li { font-size: 21px; line-height: 1.5; margin-bottom: 15px; position: relative; padding-left: 35px; }
+        .content-list li::before { content: "►"; color: var(--primary); position: absolute; left: 0; font-size: 16px; top: 4px; }
+
+        /* Visual Elements */
+        .visual-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; height: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 300px; }
+        .equation-box { padding: 30px; text-align: center; width: 100%; }
+        .table-wrapper { overflow: auto; width: 100%; border-radius: 8px; border: 1px solid #cbd5e1; max-height: 400px; }
+        table { width: 100%; border-collapse: collapse; background: white; color: #1e293b; font-size: 16px; }
+        th { background: #0f172a; color: white; padding: 12px; text-align: left; }
+        td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+
+        .insight-box { 
+            background: #f0f9ff; border-left: 5px solid var(--primary); 
+            padding: 15px 20px; border-radius: 0 8px 8px 0; margin-top: auto;
+            font-size: 17px; color: #0369a1; flex-shrink: 0;
+        }
+        .bg-dark-slide .insight-box { background: #082f49; color: #bae6fd; }
+
+        /* Upload Screen */
+        #upload-screen { 
+            position: fixed; inset: 0; z-index: 100; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: var(--bg-dark); padding-top: 70px;
+        }
+        .upload-card {
+            background: var(--panel-dark); padding: 60px; border-radius: 20px;
+            border: 2px dashed var(--primary); text-align: center; max-width: 700px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.4); transition: transform 0.2s;
+            position: relative;
+        }
+        .upload-card.dragover { transform: scale(1.03); border-style: solid; background: #2d3a4f; }
+
+        /* Loader */
+        .scanner-line { 
+            position: absolute; left: 0; width: 100%; height: 4px; 
+            background: var(--primary); box-shadow: 0 0 15px var(--primary);
+            animation: scan 2.5s infinite linear; display: none;
+        }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+        
+        #presentation-area { display: none; padding-top: 110px; width: 100%; align-items: center; flex-direction: column; }
+        
+        .chart-container { width: 100%; height: 350px; position: relative; }
+        canvas { width: 100% !important; height: 100% !important; }
+    </style>
+</head>
+<body>
+
+    <div class="app-controls">
+        <div class="app-brand"><i class="fas fa-graduation-cap"></i> UniLecture AI</div>
+        <div class="btn-group">
+            <button class="btn btn-secondary" onclick="resetAPIKey()"><i class="fas fa-key"></i> Reset Key</button>
+            <button class="btn btn-secondary" onclick="resetApp()"><i class="fas fa-plus"></i> New Project</button>
+            <button id="export-btn" class="btn btn-primary" style="display:none" onclick="exportToPPTX()"><i class="fas fa-file-export"></i> Export PPTX</button>
+        </div>
+    </div>
+
+    <div id="upload-screen">
+        <div class="upload-card" id="drop-zone">
+            <div id="scanner" class="scanner-line"></div>
+            <i id="main-icon" class="fas fa-file-import" style="font-size: 60px; color: var(--primary); margin-bottom: 25px;"></i>
+            <h2 id="status-title" style="margin-bottom: 10px;">Deep Analysis Engine</h2>
+            <p id="status-desc" style="color: var(--text-muted); margin-bottom: 30px;">
+                Upload a university PDF. We will extract all <b>equations, tables, and graphs</b> into a comprehensive slide deck.
+            </p>
+            <input type="file" id="file-input" accept=".pdf" style="display: none;" onchange="handleFile(event)" />
+            <button class="btn btn-primary" style="margin: 0 auto; font-size: 18px; padding: 12px 35px;" onclick="document.getElementById('file-input').click()">
+                Select PDF Document
+            </button>
+        </div>
+    </div>
+
+    <div id="presentation-area"></div>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal-content">
+            <h3 id="m-title">Alert</h3>
+            <p id="m-body" style="color: var(--text-muted); margin-top: 10px;"></p>
+            <button class="modal-close" onclick="document.getElementById('modal').style.display='none'">Dismiss</button>
+        </div>
+    </div>
+
+    <script>
+        let apiKey = localStorage.getItem('gemini_api_key') || "";
+        window.currentData = null; // Global store for PPTX generation
+        
+        mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+
+        const dz = document.getElementById('drop-zone');
+        dz.ondragover = (e) => { e.preventDefault(); dz.classList.add('dragover'); };
+        dz.ondragleave = () => dz.classList.remove('dragover');
+        dz.ondrop = (e) => {
+            e.preventDefault();
+            dz.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile({ target: { files: e.dataTransfer.files } });
+        };
+
+        function showMsg(t, b) {
+            document.getElementById('m-title').innerText = t;
+            document.getElementById('m-body').innerText = b;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        function resetApp() { location.reload(); }
+        
+        function resetAPIKey() {
+            localStorage.removeItem('gemini_api_key');
+            apiKey = "";
+            showMsg("API Key Cleared", "Your API key has been removed from local storage.");
+        }
+
+        async function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file || !file.name.endsWith('.pdf')) return showMsg("Invalid File", "Please select a PDF.");
+            
+            if (!apiKey) {
+                apiKey = prompt("Please enter your Google AI Studio API key (get it free from aistudio.google.com):");
+                if (!apiKey) {
+                    e.target.value = ''; // reset input
+                    return;
+                }
+                localStorage.setItem('gemini_api_key', apiKey);
+            }
+            
+            document.getElementById('scanner').style.display = 'block';
+            document.getElementById('main-icon').className = 'fas fa-brain fa-pulse';
+            document.getElementById('status-title').innerText = "AI Vision Active";
+            document.getElementById('status-desc').innerText = `Analyzing ${file.name}... Recreating data plots and extracting full content. This can take 30-60 seconds.`;
+
+            try {
+                const reader = new FileReader();
+                const base64Promise = new Promise(res => {
+                    reader.onload = () => res(reader.result.split(',')[1]);
+                    reader.readAsDataURL(file);
+                });
+                const base64 = await base64Promise;
+
+                const data = await fetchSlides(base64);
+                window.currentData = data; 
+                
+                await renderDecks(data);
+                
+                document.getElementById('upload-screen').style.display = 'none';
+                document.getElementById('presentation-area').style.display = 'flex';
+                document.getElementById('export-btn').style.display = 'flex';
+                showMsg("Success", "Generated " + (data.slides ? data.slides.length : 0) + " exhaustive slides.");
+
+            } catch (err) {
+                console.error(err);
+                showMsg("Error", err.message || "Extraction failed.");
+                document.getElementById('scanner').style.display = 'none';
+                document.getElementById('main-icon').className = 'fas fa-file-import';
+                document.getElementById('status-title').innerText = "Deep Analysis Engine";
+                document.getElementById('status-desc').innerText = "Upload a university PDF. We will extract all equations, tables, and graphs.";
+                e.target.value = ''; // reset input
+            }
+        }
+
+        async function fetchSlides(base64) {
+            // Using a standard, currently free Google AI Studio API model
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            
+            const prompt = `
+                ACT AS: Senior University Professor.
+                TASK: Exhaustive extraction of the attached PDF into a structured slide deck.
+                STRICT RULES:
+                1. EXTRACT ALL: Cover all major sections. If the PDF is technical, generate 15-30 slides.
+                2. MATH: Use raw LaTeX wrapped in $ (e.g. $10^2$, $C_p$). Ensure subscripts (_) and superscripts (^) are correct.
+                3. STANDALONE MATH: Use 'equation' layout for prominent formulas.
+                4. TABLES: Use strict standard HTML <table> tags for tabular data.
+                5. GRAPHS: Use 'chart' layout for data plots. Extract approximate numerical coordinates for (x,y).
+                6. NO PROFESSOR NOTES: Use 'key_insight' field only.
+                7. RESPONSE FORMAT: Return ONLY a valid JSON object. Do not include extra text or markdown code blocks.
+
+                JSON SCHEMA:
+                { "slides": [ {
+                    "layout": "title | content | equation | table | chart | diagram",
+                    "title": "Slide Title",
+                    "bullets": ["Point 1 with $x^2$", "Point 2"],
+                    "latex": "Full formula here",
+                    "table_html": "<table>...</table>",
+                    "chart_data": { 
+                        "type": "line", 
+                        "x_label": "X Label", 
+                        "y_label": "Y Label", 
+                        "y_scale": "linear | logarithmic", 
+                        "datasets": [{"label": "Series Name", "data": [{"x":0,"y":100}, {"x":10, "y":1}]}] 
+                    },
+                    "key_insight": "Explanatory insight for students."
+                } ] }
+            `;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "application/pdf", data: base64 } }] }],
+                    generationConfig: { 
+                        responseMimeType: "application/json", 
+                        maxOutputTokens: 8192,
+                        temperature: 0.2
+                    }
+                })
+            });
+            const json = await res.json();
+            if (json.error) throw new Error(json.error.message);
+            
+            let rawText = json.candidates[0].content.parts[0].text;
+            
+            try {
+                rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+                return JSON.parse(rawText);
+            } catch (e) {
+                console.warn("First parse failed, trying regex extraction", e);
+                const match = rawText.match(/\{[\s\S]*\}/);
+                if (match) {
+                    try {
+                        return JSON.parse(match[0]);
+                    } catch (innerE) {
+                        throw new Error("The AI returned malformed JSON. Please try again or with a smaller PDF.");
+                    }
+                }
+                throw new Error("Could not find valid JSON in AI response.");
+            }
+        }
+
+        async function renderDecks(data) {
+            const area = document.getElementById('presentation-area');
+            area.innerHTML = '';
+            const chartConfigs = [];
+
+            if (!data.slides || !Array.isArray(data.slides)) {
+                throw new Error("Invalid slide data received from AI.");
+            }
+
+            data.slides.forEach((s, i) => {
+                const div = document.createElement('div');
+                div.className = `slide-container ${s.layout === 'title' ? 'bg-dark-slide' : ''}`;
+                div.id = `slide-${i}`;
+                
+                let visual = '';
+                if (s.layout === 'equation') {
+                    const mathString = s.latex || "";
+                    let renderedMath = "";
+                    try {
+                        renderedMath = katex.renderToString(mathString, {displayMode:true, throwOnError: false});
+                    } catch(err) { renderedMath = mathString; }
+                    visual = `<div class="visual-box equation-box">${renderedMath}</div>`;
+                } else if (s.layout === 'table') {
+                    visual = `<div class="table-wrapper">${s.table_html || '<p>No table data found</p>'}</div>`;
+                } else if (s.layout === 'chart' && s.chart_data) {
+                    const id = `chart-${i}`;
+                    visual = `<div class="visual-box"><div class="chart-container"><canvas id="${id}"></canvas></div></div>`;
+                    chartConfigs.push({ id, data: s.chart_data });
+                } else if (s.layout === 'diagram' && s.mermaid_code) {
+                    visual = `<div class="visual-box"><div class="mermaid">${s.mermaid_code.replace(/```mermaid/gi, '').replace(/```/g, '').trim()}</div></div>`;
+                }
+
+                div.innerHTML = `
+                    <h2 class="slide-title">${s.title || 'Lecture Slide'}</h2>
+                    <div class="content-area">
+                        <div class="two-column" style="${['equation','table','chart','diagram'].includes(s.layout) ? '' : 'grid-template-columns: 1fr;'}">
+                            <div class="content-list">
+                                <ul>${(s.bullets || []).map(b => `<li>${b}</li>`).join('')}</ul>
+                            </div>
+                            ${visual ? `<div style="height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden;">${visual}</div>` : ''}
+                        </div>
+                        ${s.key_insight ? `<div class="insight-box"><b>Key Insight:</b> ${s.key_insight}</div>` : ''}
+                    </div>
+                `;
+                area.appendChild(div);
+            });
+
+            area.style.display = 'flex';
+
+            renderMathInElement(area, { 
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ], 
+                throwOnError: false 
+            });
+
+            if (typeof mermaid !== 'undefined') {
+                try {
+                    await mermaid.run({ querySelector: '.mermaid' });
+                } catch (e) { console.error("Mermaid error", e); }
+            }
+
+            chartConfigs.forEach(cfg => {
+                const ctx = document.getElementById(cfg.id);
+                if (!ctx || !cfg.data) return;
+                
+                const yAxisType = (cfg.data.y_scale === 'logarithmic') ? 'logarithmic' : 'linear';
+                
+                new Chart(ctx, {
+                    type: cfg.data.type === 'scatter' ? 'scatter' : 'line',
+                    data: {
+                        datasets: (cfg.data.datasets || []).map(ds => ({
+                            label: ds.label || 'Data',
+                            data: (ds.data || []).map(p => ({ x: Number(p.x), y: Number(p.y) })),
+                            borderColor: '#38bdf8', 
+                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                            fill: true,
+                            tension: 0.1, 
+                            borderWidth: 3, 
+                            pointRadius: 5
+                        }))
+                    },
+                    options: {
+                        animation: false, 
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { 
+                                type: 'linear', 
+                                title: { display: true, text: cfg.data.x_label || 'X Axis', color: '#1e293b' },
+                                ticks: { color: '#1e293b' }
+                            },
+                            y: { 
+                                type: yAxisType, 
+                                title: { display: true, text: cfg.data.y_label || 'Y Axis', color: '#1e293b' },
+                                ticks: { color: '#1e293b' }
+                            }
+                        },
+                        plugins: {
+                            legend: { labels: { color: '#1e293b' } }
+                        }
+                    }
+                });
+            });
+        }
+
+        // ---------- PPTX NATIVE GENERATION ENGINE ----------
+
+        function processLatexToHTML(str) {
+            if (!str) return '';
+            return str.replace(/\$([^$]+)\$/g, (match, mathContent) => {
+                let html = mathContent.replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>');
+                html = html.replace(/\^([A-Za-z0-9+-]+)/g, '<sup>$1</sup>');
+                html = html.replace(/_\{([^}]+)\}/g, '<sub>$1</sub>');
+                html = html.replace(/_([A-Za-z0-9+-]+)/g, '<sub>$1</sub>');
+                return html;
+            });
+        }
+
+        function parseHtmlToPptxText(htmlString, baseOptions, addBreakLine = true, isBullet = false) {
+            let processed = processLatexToHTML(htmlString); 
+
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = processed;
+            
+            const textArray = [];
+            let isFirstTextNode = true;
+            
+            function traverse(node, currentOptions) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    if (node.textContent && node.textContent.length > 0) {
+                        const opts = { ...baseOptions, ...currentOptions };
+                        
+                        // CRITICAL FIX: Only apply bullet to the FIRST text fragment of the line!
+                        // If applied to all fragments (like subscripts), PowerPoint treats each fragment as a new line.
+                        if (isBullet) {
+                            if (isFirstTextNode) {
+                                opts.bullet = baseOptions.bullet || true;
+                                isFirstTextNode = false;
+                            } else {
+                                delete opts.bullet;
+                            }
+                        }
+                        
+                        textArray.push({ text: node.textContent, options: opts });
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    const newOptions = { ...currentOptions };
+                    if (node.tagName === 'STRONG' || node.tagName === 'B') newOptions.bold = true;
+                    if (node.tagName === 'EM' || node.tagName === 'I') newOptions.italic = true;
+                    if (node.tagName === 'SUP') newOptions.superscript = true;
+                    if (node.tagName === 'SUB') newOptions.subscript = true;
+                    node.childNodes.forEach(child => traverse(child, newOptions));
+                }
+            }
+            
+            tempDiv.childNodes.forEach(child => traverse(child, {}));
+            
+            // Add breakLine ONLY to the very last fragment so PptxGenJS keeps everything on one bullet line
+            if (textArray.length > 0) {
+                if (addBreakLine) textArray[textArray.length - 1].options.breakLine = true;
+            } else {
+                const emptyOpts = { ...baseOptions, breakLine: addBreakLine };
+                if (isBullet) emptyOpts.bullet = baseOptions.bullet || true;
+                textArray.push({ text: " ", options: emptyOpts });
+            }
+            return textArray;
+        }
+
+        function parseHtmlTableToPptx(htmlTableString) {
+            let processed = processLatexToHTML(htmlTableString);
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = processed;
+            const rows = [];
+            
+            function parseCell(node, textOpts) {
+                const textArray = [];
+                function traverse(n, currentOptions) {
+                    if (n.nodeType === Node.TEXT_NODE) {
+                        if (n.textContent && n.textContent.length > 0) {
+                            textArray.push({ text: n.textContent, options: { ...textOpts, ...currentOptions } });
+                        }
+                    } else if (n.nodeType === Node.ELEMENT_NODE) {
+                        const newOptions = { ...currentOptions };
+                        if (n.tagName === 'STRONG' || n.tagName === 'B') newOptions.bold = true;
+                        if (n.tagName === 'EM' || n.tagName === 'I') newOptions.italic = true;
+                        if (n.tagName === 'SUP') newOptions.superscript = true;
+                        if (n.tagName === 'SUB') newOptions.subscript = true;
+                        n.childNodes.forEach(child => traverse(child, newOptions));
+                    }
+                }
+                node.childNodes.forEach(child => traverse(child, {}));
+                if (textArray.length === 0) textArray.push({ text: " ", options: textOpts });
+                return textArray;
+            }
+
+            const headerCells = tempDiv.querySelectorAll('th');
+            if (headerCells.length > 0) {
+                const headerRow = [];
+                headerCells.forEach(th => {
+                    // FIX: Separate cell options (fill/border) from text options (color/font)
+                    const cellOpts = { fill: '0f172a', valign: 'middle', margin: 0.1, border: { pt: 1, color: 'cbd5e1' } };
+                    const textOpts = { color: 'ffffff', fontFace: 'Merriweather', bold: true, fontSize: 14 };
+                    headerRow.push({ text: parseCell(th, textOpts), options: cellOpts });
+                });
+                rows.push(headerRow);
+            }
+            
+            const trs = tempDiv.querySelectorAll('tr');
+            const dataRows = headerCells.length > 0 ? Array.from(trs).slice(1) : Array.from(trs);
+            
+            dataRows.forEach((tr, i) => {
+                const row = [];
+                const isEven = i % 2 === 0;
+                tr.querySelectorAll('td').forEach(td => {
+                    const cellOpts = { fill: isEven ? 'f8fafc' : 'ffffff', valign: 'middle', margin: 0.1, border: { pt: 1, color: 'e2e8f0' } };
+                    const textOpts = { color: '1e293b', fontSize: 12, fontFace: 'DM Sans' };
+                    row.push({ text: parseCell(td, textOpts), options: cellOpts });
+                });
+                if (row.length > 0) rows.push(row);
+            });
+            
+            return rows;
+        }
+
+        async function exportToPPTX() {
+            if (!window.currentData) return showMsg("Error", "No presentation data found.");
+            const btn = document.getElementById('export-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PPTX natively...';
+            btn.disabled = true;
+
+            try {
+                const pptx = new PptxGenJS();
+                pptx.layout = 'LAYOUT_16x9';
+
+                for (let i = 0; i < window.currentData.slides.length; i++) {
+                    const s = window.currentData.slides[i];
+                    const isDark = s.theme === 'dark' || s.layout === 'title';
+                    const pptSlide = pptx.addSlide();
+                    
+                    pptSlide.background = { fill: isDark ? '0f172a' : 'f8fafc' };
+                    const titleColor = isDark ? 'ffffff' : '0f172a';
+                    const textColor = isDark ? 'f8fafc' : '1e293b';
+                    const accent = '38bdf8';
+
+                    if (s.layout === 'title') {
+                        const titleOpts = { x: 0.5, y: 2.0, w: 9.0, align: 'center', fontSize: 44, color: titleColor, bold: true, fontFace: 'Merriweather' };
+                        pptSlide.addText(parseHtmlToPptxText(s.title || '', titleOpts, false, false), titleOpts);
+                        if (s.subtitle) {
+                            const subOpts = { x: 0.5, y: 3.0, w: 9.0, align: 'center', fontSize: 24, color: accent, fontFace: 'DM Sans' };
+                            pptSlide.addText(parseHtmlToPptxText(s.subtitle, subOpts, false, false), subOpts);
+                        }
+                    } 
+                    else if (s.layout === 'section') {
+                        pptSlide.addShape(pptx.ShapeType.rect, { x: 4.25, y: 2.0, w: 1.5, h: 0.05, fill: accent });
+                        const titleOpts = { x: 0.5, y: 2.5, w: 9.0, align: 'center', fontSize: 40, color: titleColor, bold: true, fontFace: 'Merriweather' };
+                        pptSlide.addText(parseHtmlToPptxText(s.title || '', titleOpts, false, false), titleOpts);
+                        if (s.subtitle) {
+                            const subOpts = { x: 0.5, y: 3.2, w: 9.0, align: 'center', fontSize: 20, color: textColor, fontFace: 'DM Sans' };
+                            pptSlide.addText(parseHtmlToPptxText(s.subtitle, subOpts, false, false), subOpts);
+                        }
+                    }
+                    else {
+                        const titleOpts = { x: 0.5, y: 0.4, w: 9.0, h: 0.6, fontSize: 32, color: titleColor, bold: true, fontFace: 'Merriweather' };
+                        pptSlide.addText(parseHtmlToPptxText(s.title || '', titleOpts, false, false), titleOpts);
+                        pptSlide.addShape(pptx.ShapeType.rect, { x: 0.5, y: 1.1, w: 9.0, h: 0.02, fill: accent });
+                        
+                        const hasVisual = ['equation', 'diagram', 'chart', 'table'].includes(s.layout);
+                        const bulletW = hasVisual ? 4.2 : 9.0;
+                        
+                        if (s.bullets && s.bullets.length > 0) {
+                            let allBulletParts = [];
+                            s.bullets.forEach(b => {
+                                const baseOpts = { color: textColor, fontSize: 16, fontFace: 'DM Sans', bullet: { color: accent } };
+                                const lineParts = parseHtmlToPptxText(b, baseOpts, true, true);
+                                allBulletParts = allBulletParts.concat(lineParts);
+                            });
+                            pptSlide.addText(allBulletParts, { x: 0.5, y: 1.4, w: bulletW, h: 3.2, valign: 'top' });
+                        }
+                        
+                        if (s.key_insight) {
+                            const boxFill = isDark ? '082f49' : 'f0f9ff';
+                            const boxText = isDark ? 'bae6fd' : '0369a1';
+                            pptSlide.addShape(pptx.ShapeType.rect, { x: 0.5, y: 4.8, w: 0.08, h: 0.5, fill: accent });
+                            pptSlide.addShape(pptx.ShapeType.rect, { x: 0.58, y: 4.8, w: bulletW - 0.08, h: 0.5, fill: boxFill });
+                            
+                            const insightBaseOpts = { color: boxText, fontSize: 12, fontFace: 'DM Sans' };
+                            let insightParts = [ { text: "Key Insight: ", options: { ...insightBaseOpts, bold: true, fontFace: 'Merriweather' } } ];
+                            const parsedInsight = parseHtmlToPptxText(s.key_insight, insightBaseOpts, false, false);
+                            insightParts = insightParts.concat(parsedInsight);
+
+                            pptSlide.addText(insightParts, { x: 0.65, y: 4.8, w: bulletW - 0.2, h: 0.5, valign: 'middle' });
+                        }
+
+                        if (s.layout === 'table' && s.table_html) {
+                            const tableData = parseHtmlTableToPptx(s.table_html);
+                            if (tableData.length > 0) pptSlide.addTable(tableData, { x: 5.0, y: 1.4, w: 4.5 });
+                        } 
+                        else if (hasVisual) {
+                            const slideDom = document.getElementById(`slide-${i}`);
+                            const visualBox = slideDom ? slideDom.querySelector('.visual-box') : null;
+                            if (visualBox) {
+                                const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true });
+                                pptSlide.addImage({ data: canvas.toDataURL('image/png'), x: 5.0, y: 1.4, w: 4.5, h: 3.2, sizing: { type: 'contain', w: 4.5, h: 3.2 } });
+                            }
+                        }
+                    }
+                }
+                
+                await pptx.writeFile({ fileName: 'University_Lecture.pptx' });
+                showMsg("Export Complete", "Editable presentation saved successfully.");
+            } catch (err) {
+                console.error(err);
+                showMsg("Export Error", "Failed to generate PPTX natively.");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
