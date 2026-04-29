@@ -220,6 +220,19 @@
         <button class="btn btn-secondary" onclick="resetApp()"><i class="fas fa-plus"></i> New Project</button>
         <button id="export-btn" class="btn btn-primary" style="display:none" onclick="exportToPPTX()"><i class="fas fa-file-export"></i> Export PPTX</button>
     </div>
+
+    <!-- Lecture Processing Grid -->
+    <div id="lecture-processing-screen" style="display:none; width:100%; max-width: 1200px; padding: 20px;">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold font-['Merriweather']">Slide Extractor: Page-by-Page</h2>
+            <div class="flex gap-3">
+                <button class="px-4 py-2 bg-slate-700 text-white rounded font-bold hover:bg-slate-600 transition" onclick="lecture_generateAll()"><i class="fas fa-magic mr-2"></i> Generate All</button>
+                <button class="px-4 py-2 bg-sky-500 text-slate-900 rounded font-bold hover:bg-sky-400 transition shadow-lg shadow-sky-500/20" onclick="lecture_compile()"><i class="fas fa-layer-group mr-2"></i> Compile Slides</button>
+            </div>
+        </div>
+        <div id="lecture-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+    </div>
+
     <div id="upload-screen">
         <div class="upload-card" id="drop-zone">
             <div id="scanner" class="scanner-line"></div>
@@ -320,6 +333,23 @@
                 <i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0 mt-0.5"></i>
                 <p id="error-text" class="text-sm font-medium m-0"></p>
             </div>
+        </div>
+
+
+        <!-- EduWeaver Processing Grid -->
+        <div id="ew-processing-screen" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl relative w-full hidden max-w-6xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold text-slate-200">Video Studio: Frame-by-Frame Generation</h2>
+                <div class="flex gap-3">
+                    <button class="bg-slate-800 border border-slate-700 text-white px-4 py-2 rounded-lg font-semibold hover:bg-slate-700 transition" onclick="ew_generateAll()">
+                        <i data-lucide="play" class="w-4 h-4 inline mr-1"></i> Generate All
+                    </button>
+                    <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-500 transition shadow-lg shadow-indigo-500/20" onclick="ew_compileVideo()">
+                        <i data-lucide="film" class="w-4 h-4 inline mr-1"></i> Compile Video
+                    </button>
+                </div>
+            </div>
+            <div id="ew-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
         </div>
 
         <!-- Loading / Exporting State -->
@@ -958,18 +988,24 @@
             }
         }
 
+        
         function resetAPIKeyGlobal() {
             localStorage.removeItem('gemini_api_key');
             apiKey = "";
-            alert("API Key cleared! You will be prompted for it on your next action.");
-            location.reload();
+            requestGlobalApiKey();
+            if(apiKey) {
+                alert("API Key updated! You can now continue generating.");
+            }
         }
 
         function requestGlobalApiKey() {
-            apiKey = prompt("Please enter your Google AI Studio API key (get it free from aistudio.google.com):");
-            if (apiKey) {
+            let newKey = prompt("Please enter your Google AI Studio API key (get it free from aistudio.google.com):");
+            if (newKey && newKey.trim() !== "") {
+                apiKey = newKey.trim();
                 localStorage.setItem('gemini_api_key', apiKey);
             }
+        }
+
         }
 
 
@@ -1143,6 +1179,7 @@
             ew_clearFile();
             
             ew_domElements.playbackSection.style.display = 'none';
+            document.getElementById('ew-processing-screen').classList.add('hidden');
             ew_domElements.loadingSection.style.display = 'none';
             ew_domElements.inputSection.style.display = 'block';
             ew_domElements.errorBox.classList.add('hidden');
@@ -1355,8 +1392,14 @@
         }
 
         // --- Main Generation Flow ---
+        
         async function ew_startProcessing() {
             if (!ew_appState.selectedFile) return;
+
+            if (!apiKey) {
+                requestGlobalApiKey();
+                if(!apiKey) return;
+            }
 
             ew_domElements.inputSection.style.display = 'none';
             ew_domElements.loadingSection.style.display = 'flex';
@@ -1368,77 +1411,149 @@
             ew_appState.isPlaying = false;
             
             try {
-                // Step 1: Extract Images
                 ew_updateLoadingStatus(isAr ? "جاري استخراج الشرائح من الملف..." : "Extracting slides from document...", 'extract');
                 const slideImages = await ew_extractSlidesFromPDF(ew_appState.selectedFile);
                 
                 if (slideImages.length === 0) throw new Error(isAr ? "لم يتم العثور على شرائح في الملف." : "No slides found in the document.");
 
-                // If Reel mode, limit slides to a maximum of 6 to ensure fast pacing (30s / 6 = 5s per slide)
-                let slideImagesToProcess = slideImages;
-                if (ew_appState.videoMode === 'reel' && slideImages.length > 6) {
-                    slideImagesToProcess = [];
-                    const step = (slideImages.length - 1) / 5; 
-                    for(let i=0; i<6; i++) {
-                        slideImagesToProcess.push(slideImages[Math.round(i * step)]);
+                ew_appState.extractedImages = slideImages;
+                ew_appState.generatedScenes = {}; 
+                
+                ew_domElements.loadingSection.style.display = 'none';
+                document.getElementById('ew-processing-screen').classList.remove('hidden');
+                
+                ew_renderGrid();
+            } catch(err) {
+                ew_domElements.loadingSection.style.display = 'none';
+                ew_domElements.inputSection.style.display = 'block';
+                ew_showError(err.message);
+            }
+        }
+
+        function ew_renderGrid() {
+            const grid = document.getElementById('ew-grid');
+            grid.innerHTML = '';
+            
+            ew_appState.extractedImages.forEach((imgBase64, index) => {
+                const statusHTML = ew_appState.generatedScenes[index] 
+                    ? `<span class="text-emerald-400 font-semibold text-sm flex items-center gap-1"><i data-lucide="check-circle" class="w-4 h-4"></i> Done</span>`
+                    : `<span class="text-slate-400 font-semibold text-sm flex items-center gap-1" id="ew-status-${index}"><i data-lucide="clock" class="w-4 h-4"></i> Pending</span>`;
+                    
+                grid.innerHTML += `
+                    <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col items-center shadow-lg">
+                        <img src="${imgBase64}" class="w-full aspect-[4/3] object-contain bg-black/50 rounded-lg mb-4 border border-slate-700" />
+                        <div class="w-full flex justify-between items-center mb-4">
+                            <span class="font-bold text-slate-200">Page ${index + 1}</span>
+                            ${statusHTML}
+                        </div>
+                        <button id="ew-btn-${index}" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1" onclick="ew_generateScene(${index})">
+                            <i data-lucide="wand-2" class="w-4 h-4"></i> Generate Scene
+                        </button>
+                    </div>
+                `;
+            });
+            if(typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        async function ew_generateScene(index) {
+            if (!apiKey) {
+                requestGlobalApiKey();
+                if(!apiKey) return;
+            }
+
+            const btn = document.getElementById(`ew-btn-${index}`);
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Generating...`;
+            btn.classList.replace('bg-indigo-600', 'bg-slate-600');
+            btn.classList.replace('hover:bg-indigo-500', 'hover:bg-slate-500');
+            if(typeof lucide !== 'undefined') lucide.createIcons();
+            
+            try {
+                const base64Img = ew_appState.extractedImages[index];
+                const totalSlides = ew_appState.extractedImages.length;
+                const targetWordsPerSlide = ew_appState.videoMode === 'reel' ? 15 : 0; 
+
+                const prevNarrations = Object.values(ew_appState.generatedScenes).map(s => s.narration);
+                
+                const narration = await ew_apiAnalyzeSlide(base64Img, ew_appState.language, index, totalSlides, prevNarrations, ew_appState.videoMode, targetWordsPerSlide);
+                const audioUrl = await ew_apiGenerateAudio(narration);
+
+                const animationToUse = ew_appState.videoMode === 'reel' ? 'anim-dynamic-zoom' : 'anim-subtle-zoom';
+
+                ew_appState.generatedScenes[index] = {
+                    imageUrl: base64Img,
+                    narration: narration,
+                    audioUrl: audioUrl,
+                    animationClass: animationToUse 
+                };
+                
+                ew_renderGrid();
+            } catch(err) {
+                btn.disabled = false;
+                btn.innerHTML = `<i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry`;
+                btn.classList.replace('bg-slate-600', 'bg-red-500');
+                btn.classList.replace('hover:bg-slate-500', 'hover:bg-red-400');
+                if(typeof lucide !== 'undefined') lucide.createIcons();
+                alert(`Failed to generate Video Scene ${index + 1}: ${err.message}. If 429 error, change API key.`);
+            }
+        }
+
+        async function ew_generateAll() {
+            for (let i = 0; i < ew_appState.extractedImages.length; i++) {
+                if (!ew_appState.generatedScenes[i]) {
+                    try {
+                        await ew_generateScene(i);
+                        await new Promise(r => setTimeout(r, 1000));
+                    } catch (err) {
+                        console.error("Stopping auto-generation due to error", err);
+                        break;
                     }
                 }
+            }
+        }
 
-                const totalSlides = slideImagesToProcess.length;
-                // Target word count for Reel: ~70 words total for a 30s audio.
-                const targetWordsPerSlide = ew_appState.videoMode === 'reel' ? Math.floor(70 / totalSlides) : 0;
-
-                const populatedScenes = [];
-                const allNarrations = [];
-
-                // Step 2: Analyze & Generate TTS per slide
-                for (let i = 0; i < totalSlides; i++) {
-                    const base64Img = slideImagesToProcess[i];
-                    
-                    ew_updateLoadingStatus(
-                        isAr ? `جاري تحليل شريحة ${i + 1} من ${totalSlides} وكتابة الشرح...` : `Analyzing slide ${i + 1} of ${totalSlides}...`, 
-                        'ai'
-                    );
-                    
-                    const narration = await ew_withRetry(() => ew_apiAnalyzeSlide(base64Img, ew_appState.language, i, totalSlides, allNarrations, ew_appState.videoMode, targetWordsPerSlide));
-                    allNarrations.push(narration);
-
-                    ew_updateLoadingStatus(
-                        isAr ? `جاري تسجيل الصوت للشريحة ${i + 1}...` : `Recording voiceover for slide ${i + 1}...`, 
-                        'audio'
-                    );
-                    const audioUrl = await ew_withRetry(() => ew_apiGenerateAudio(narration));
-
-                    // Use faster dynamic zoom for reels
-                    const animationToUse = ew_appState.videoMode === 'reel' ? 'anim-dynamic-zoom' : 'anim-subtle-zoom';
-
-                    populatedScenes.push({
-                        imageUrl: base64Img,
-                        narration: narration,
-                        audioUrl: audioUrl,
-                        animationClass: animationToUse 
-                    });
+        async function ew_compileVideo() {
+            const scenes = [];
+            const narrations = [];
+            
+            for (let i = 0; i < ew_appState.extractedImages.length; i++) {
+                if (ew_appState.generatedScenes[i]) {
+                    scenes.push(ew_appState.generatedScenes[i]);
+                    narrations.push(ew_appState.generatedScenes[i].narration);
                 }
+            }
+            
+            if (scenes.length === 0) {
+                alert("No scenes generated! Please generate at least one page.");
+                return;
+            }
 
-                // Step 3: Generate SEO Metadata
-                ew_updateLoadingStatus(isAr ? "جاري تحسين بيانات النشر..." : "Generating YouTube Metadata...", 'ai');
-                const metadata = await ew_withRetry(() => ew_apiGenerateMetadata(allNarrations, ew_appState.language, ew_appState.videoMode));
+            if (!apiKey) {
+                requestGlobalApiKey();
+                if(!apiKey) return;
+            }
 
+            document.getElementById('ew-processing-screen').classList.add('hidden');
+            ew_domElements.loadingSection.style.display = 'flex';
+            ew_updateLoadingStatus("Generating Final Metadata...", 'ai');
+            
+            try {
+                const metadata = await ew_apiGenerateMetadata(narrations, ew_appState.language, ew_appState.videoMode);
+                
                 ew_appState.story = {
                     title: metadata.title,
-                    scenes: populatedScenes,
+                    scenes: scenes,
                     youtubeMetadata: metadata
                 };
 
                 ew_startPlayback();
-
-            } catch (err) {
-                console.error("Processing Error:", err);
+            } catch(err) {
+                alert("Failed to generate metadata: " + err.message);
+                document.getElementById('ew-processing-screen').classList.remove('hidden');
                 ew_domElements.loadingSection.style.display = 'none';
-                ew_domElements.inputSection.style.display = 'block';
-                ew_showError((isAr ? "حدث خطأ أثناء المعالجة: " : "An error occurred: ") + err.message);
             }
         }
+
 
         function ew_updateLoadingStatus(text, activeIcon) {
             ew_domElements.statusText.innerText = text;
