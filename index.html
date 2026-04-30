@@ -136,12 +136,25 @@
         @media print {
             @page { size: landscape; margin: 0; }
             body { background: white !important; min-height: auto; overflow: visible; }
-            body > *:not(#presentation-area) { display: none !important; }
-            #presentation-area { display: block !important; padding-top: 0 !important; }
+            
+            /* Hide everything */
+            body * { visibility: hidden; }
+            
+            /* Show only the presentation area and its contents */
+            #presentation-area, #presentation-area * { visibility: visible; }
+            
+            /* Position presentation area at top */
+            #presentation-area { 
+                display: block !important; 
+                position: absolute; top: 0; left: 0; width: 100%;
+                padding-top: 0 !important; 
+            }
+            
             .slide-container {
                 width: 100vw !important; height: 100vh !important;
                 margin: 0 !important; box-shadow: none !important;
                 page-break-after: always; break-after: page;
+                position: relative;
                 -webkit-print-color-adjust: exact; print-color-adjust: exact;
             }
             .slide-container:last-child { page-break-after: avoid; break-after: avoid; }
