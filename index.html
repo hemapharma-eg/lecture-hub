@@ -18,6 +18,7 @@
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 
     <!-- Visual Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/libs/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
@@ -1046,8 +1047,14 @@
                                 const vW = (s.bullets && s.bullets.length > 0) ? 4.5 : 9.0;
                                 const vY = (s.bullets && s.bullets.length > 0) ? 1.4 : 1.1;
                                 const vH = (s.bullets && s.bullets.length > 0) ? 3.2 : 4.0;
-                                const dataUrl = await htmlToImage.toPng(visualBox, { pixelRatio: 2, backgroundColor: '#ffffff' });
-                                pptSlide.addImage({ data: dataUrl, x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
+                                
+                                if (s.layout === 'equation') {
+                                    const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true });
+                                    pptSlide.addImage({ data: canvas.toDataURL('image/png'), x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
+                                } else {
+                                    const dataUrl = await htmlToImage.toPng(visualBox, { pixelRatio: 2, backgroundColor: '#ffffff' });
+                                    pptSlide.addImage({ data: dataUrl, x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
+                                }
                             }
                         }
                     }
