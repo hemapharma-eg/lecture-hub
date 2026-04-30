@@ -1050,12 +1050,27 @@
                                 const vY = (s.bullets && s.bullets.length > 0) ? 1.4 : 1.1;
                                 const vH = (s.bullets && s.bullets.length > 0) ? 3.2 : 4.0;
                                 
+                                // For equations: fix fraction lines before capture (html2canvas mispositions borders)
+                                const fracLines = (s.layout === 'equation') ? visualBox.querySelectorAll('.frac-line') : [];
+                                fracLines.forEach(line => {
+                                    line.dataset.origStyle = line.style.cssText;
+                                    const h = parseFloat(window.getComputedStyle(line).borderBottomWidth) || 1;
+                                    line.style.borderBottom = 'none';
+                                    line.style.height = h + 'px';
+                                    line.style.backgroundColor = '#1e293b';
+                                });
+                                
                                 try {
                                     const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' });
                                     pptSlide.addImage({ data: canvas.toDataURL('image/png'), x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
                                 } catch(captureErr) {
                                     console.warn('Visual capture failed for slide ' + i, captureErr);
                                 }
+                                
+                                // Restore original fraction line styles
+                                fracLines.forEach(line => {
+                                    line.style.cssText = line.dataset.origStyle || '';
+                                });
                             }
                         }
                     }
