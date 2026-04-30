@@ -19,7 +19,6 @@
 
     <!-- Visual Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/libs/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
@@ -1045,30 +1044,21 @@
                                 const vY = (s.bullets && s.bullets.length > 0) ? 1.4 : 1.1;
                                 const vH = (s.bullets && s.bullets.length > 0) ? 3.2 : 4.0;
                                 
-                                if (s.layout === 'equation') {
-                                    const fracLines = visualBox.querySelectorAll('.katex-frac-line');
-                                    const origStyles = [];
-                                    fracLines.forEach(el => {
-                                        origStyles.push({ borderBottom: el.style.borderBottom, height: el.style.height, backgroundColor: el.style.backgroundColor });
-                                        const comp = window.getComputedStyle(el);
-                                        el.style.borderBottom = 'none';
-                                        el.style.height = comp.borderBottomWidth || '1.5px';
-                                        el.style.backgroundColor = comp.borderBottomColor || 'black';
-                                    });
-                                    
-                                    const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true });
-                                    
-                                    fracLines.forEach((el, idx) => {
-                                        el.style.borderBottom = origStyles[idx].borderBottom;
-                                        el.style.height = origStyles[idx].height;
-                                        el.style.backgroundColor = origStyles[idx].backgroundColor;
-                                    });
-                                    
-                                    pptSlide.addImage({ data: canvas.toDataURL('image/png'), x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
-                                } else {
-                                    const dataUrl = await htmlToImage.toPng(visualBox, { pixelRatio: 2, backgroundColor: '#ffffff' });
-                                    pptSlide.addImage({ data: dataUrl, x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
+                                const isEquation = s.layout === 'equation';
+                                let tempStyle = null;
+                                if (isEquation) {
+                                    tempStyle = document.createElement('style');
+                                    tempStyle.innerHTML = `.katex-frac-line { border-bottom: none !important; height: 1.5px !important; background-color: #1e293b !important; }`;
+                                    document.head.appendChild(tempStyle);
                                 }
+                                
+                                const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' });
+                                
+                                if (tempStyle) {
+                                    document.head.removeChild(tempStyle);
+                                }
+                                
+                                pptSlide.addImage({ data: canvas.toDataURL('image/png'), x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
                             }
                         }
                     }
