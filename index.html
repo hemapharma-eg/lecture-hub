@@ -830,11 +830,16 @@
 
         function processLatexToHTML(str) {
             if (!str) return '';
-            return str.replace(/\$([^$]+)\$/g, (match, mathContent) => {
+            let s = str.replace(/\\circ/g, '°');
+            s = s.replace(/\^o(?=C|F|\s|$)/g, '<sup>o</sup>');
+            s = s.replace(/\^0(?=C|F|\s|$)/g, '<sup>0</sup>');
+            s = s.replace(/\^O(?=C|F|\s|$)/g, '<sup>O</sup>');
+
+            return s.replace(/\$([^$]+)\$/g, (match, mathContent) => {
                 let html = mathContent.replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>');
-                html = html.replace(/\^([A-Za-z0-9+-]+)/g, '<sup>$1</sup>');
+                html = html.replace(/\^([A-Za-z0-9+\-°])/g, '<sup>$1</sup>');
                 html = html.replace(/_\{([^}]+)\}/g, '<sub>$1</sub>');
-                html = html.replace(/_([A-Za-z0-9+-]+)/g, '<sub>$1</sub>');
+                html = html.replace(/_([A-Za-z0-9+\-°])/g, '<sub>$1</sub>');
                 return html;
             });
         }
@@ -984,7 +989,7 @@
                         }
                     }
                     else {
-                        const titleOpts = { x: 0.5, y: 0.4, w: 9.0, h: 0.6, fontSize: 32, color: titleColor, bold: true, fontFace: 'Merriweather' };
+                        const titleOpts = { x: 0.5, y: 0.4, w: 9.0, h: 0.6, fontSize: 24, color: titleColor, bold: true, fontFace: 'Merriweather' };
                         pptSlide.addText(parseHtmlToPptxText(s.title || '', titleOpts, false, false), titleOpts);
                         pptSlide.addShape(pptx.ShapeType.rect, { x: 0.5, y: 1.1, w: 9.0, h: 0.02, fill: accent });
                         
@@ -994,7 +999,7 @@
                         if (s.bullets && s.bullets.length > 0) {
                             let allBulletParts = [];
                             s.bullets.forEach(b => {
-                                const baseOpts = { color: textColor, fontSize: 16, fontFace: 'DM Sans', bullet: { color: accent } };
+                                const baseOpts = { color: textColor, fontSize: 14, fontFace: 'DM Sans', bullet: { color: accent } };
                                 const lineParts = parseHtmlToPptxText(b, baseOpts, true, true);
                                 allBulletParts = allBulletParts.concat(lineParts);
                             });
