@@ -33,7 +33,7 @@
             --text-muted: #cbd5e1;
         }
 
-        * { box-sizing: border-box; }
+        *:not(.katex):not(.katex *) { box-sizing: border-box; }
         body { 
             margin: 0; padding: 0; 
             background-color: var(--bg-dark); 
@@ -91,7 +91,8 @@
 
         /* Visual Elements */
         .visual-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; height: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 300px; }
-        .equation-box { padding: 30px; text-align: center; width: 100%; }
+        .equation-box { padding: 30px; text-align: center; width: 100%; flex-direction: column; color: #1e293b; }
+        .equation-box .katex-display { margin: 0.5em 0; }
         .table-wrapper { overflow: auto; width: 100%; border-radius: 8px; border: 1px solid #cbd5e1; max-height: 400px; }
         table { width: 100%; border-collapse: collapse; background: white; color: #1e293b; font-size: 16px; }
         th { background: #0f172a; color: white; padding: 12px; text-align: left; }
@@ -745,10 +746,14 @@
                 if (s.layout === 'equation') {
                     let mathString = s.latex || "";
                     mathString = mathString.replace(/\\?frac/g, '\\frac');
+                    // Split multiple equations on \\\\ so each renders on its own line
+                    const eqParts = mathString.split(/\\\\/).map(p => p.trim()).filter(p => p.length > 0);
                     let renderedMath = "";
-                    try {
-                        renderedMath = katex.renderToString(mathString, {displayMode:true, throwOnError: false});
-                    } catch(err) { renderedMath = mathString; }
+                    eqParts.forEach(part => {
+                        try {
+                            renderedMath += katex.renderToString(part, {displayMode:true, throwOnError: false});
+                        } catch(err) { renderedMath += `<div>${part}</div>`; }
+                    });
                     visual = `<div class="visual-box equation-box">${renderedMath}</div>`;
                 } else if (s.layout === 'table') {
                     visual = `<div class="table-wrapper">${s.table_html || '<p>No table data found</p>'}</div>`;
@@ -1044,28 +1049,12 @@
                                 const vY = (s.bullets && s.bullets.length > 0) ? 1.4 : 1.1;
                                 const vH = (s.bullets && s.bullets.length > 0) ? 3.2 : 4.0;
                                 
-                                // Temporarily inject a style tag to fix KaTeX for capture
-                                const captureStyle = document.createElement('style');
-                                captureStyle.id = 'pptx-capture-fix';
-                                captureStyle.innerHTML = `
-                                    .visual-box .katex, .visual-box .katex * { 
-                                        box-sizing: content-box !important; 
-                                        color: #1e293b !important; 
-                                    }
-                                    .visual-box .katex .frac-line { 
-                                        border-bottom-color: #1e293b !important; 
-                                    }
-                                `;
-                                document.head.appendChild(captureStyle);
-                                
                                 try {
                                     const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' });
                                     pptSlide.addImage({ data: canvas.toDataURL('image/png'), x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
                                 } catch(captureErr) {
                                     console.warn('Visual capture failed for slide ' + i, captureErr);
                                 }
-                                
-                                document.head.removeChild(captureStyle);
                             }
                         }
                     }
