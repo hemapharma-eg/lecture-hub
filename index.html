@@ -1050,12 +1050,43 @@
                                     tempStyle = document.createElement('style');
                                     tempStyle.innerHTML = `.katex-frac-line { border-bottom: none !important; height: 1.5px !important; background-color: #1e293b !important; }`;
                                     document.head.appendChild(tempStyle);
+                                    
+                                    const katexEls = visualBox.querySelectorAll('.katex *');
+                                    katexEls.forEach(el => {
+                                        if (el.style.top) {
+                                            el.dataset.origTop = el.style.top;
+                                            const comp = window.getComputedStyle(el);
+                                            el.style.transform = `translateY(${comp.top})`;
+                                            el.style.top = '0px';
+                                        }
+                                        if (el.style.bottom) {
+                                            el.dataset.origBottom = el.style.bottom;
+                                            const comp = window.getComputedStyle(el);
+                                            el.style.transform = `translateY(-${comp.bottom})`;
+                                            el.style.bottom = '0px';
+                                        }
+                                    });
                                 }
                                 
                                 const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' });
                                 
-                                if (tempStyle) {
-                                    document.head.removeChild(tempStyle);
+                                if (isEquation) {
+                                    if (tempStyle) {
+                                        document.head.removeChild(tempStyle);
+                                    }
+                                    const katexEls = visualBox.querySelectorAll('.katex *');
+                                    katexEls.forEach(el => {
+                                        if (el.dataset.origTop) {
+                                            el.style.top = el.dataset.origTop;
+                                            el.style.transform = '';
+                                            delete el.dataset.origTop;
+                                        }
+                                        if (el.dataset.origBottom) {
+                                            el.style.bottom = el.dataset.origBottom;
+                                            el.style.transform = '';
+                                            delete el.dataset.origBottom;
+                                        }
+                                    });
                                 }
                                 
                                 pptSlide.addImage({ data: canvas.toDataURL('image/png'), x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
