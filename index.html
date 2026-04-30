@@ -1044,30 +1044,28 @@
                                 const vY = (s.bullets && s.bullets.length > 0) ? 1.4 : 1.1;
                                 const vH = (s.bullets && s.bullets.length > 0) ? 3.2 : 4.0;
                                 
-                                // Clone the visual box off-screen so we never touch the live DOM
-                                const clone = visualBox.cloneNode(true);
-                                clone.style.position = 'absolute';
-                                clone.style.left = '-9999px';
-                                clone.style.top = '0px';
-                                clone.style.width = visualBox.offsetWidth + 'px';
-                                clone.style.backgroundColor = '#ffffff';
-                                document.body.appendChild(clone);
-                                
-                                // For equations: fix KaTeX fraction lines on the clone only
-                                if (s.layout === 'equation') {
-                                    clone.querySelectorAll('.katex, .katex *').forEach(el => {
-                                        el.style.boxSizing = 'content-box';
-                                    });
-                                }
+                                // Temporarily inject a style tag to fix KaTeX for capture
+                                const captureStyle = document.createElement('style');
+                                captureStyle.id = 'pptx-capture-fix';
+                                captureStyle.innerHTML = `
+                                    .visual-box .katex, .visual-box .katex * { 
+                                        box-sizing: content-box !important; 
+                                        color: #1e293b !important; 
+                                    }
+                                    .visual-box .katex .frac-line { 
+                                        border-bottom-color: #1e293b !important; 
+                                    }
+                                `;
+                                document.head.appendChild(captureStyle);
                                 
                                 try {
-                                    const canvas = await html2canvas(clone, { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' });
+                                    const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' });
                                     pptSlide.addImage({ data: canvas.toDataURL('image/png'), x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
                                 } catch(captureErr) {
                                     console.warn('Visual capture failed for slide ' + i, captureErr);
                                 }
                                 
-                                document.body.removeChild(clone);
+                                document.head.removeChild(captureStyle);
                             }
                         }
                     }
