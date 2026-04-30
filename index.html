@@ -884,41 +884,6 @@
                     }
                 });
             });
-
-            // Pre-capture all visual boxes now (when preview is perfect)
-            // Store screenshots for PPTX export so we don't need html2canvas at export time
-            setTimeout(async () => {
-                window.visualCaptures = {};
-                for (let idx = 0; idx < data.slides.length; idx++) {
-                    const s = data.slides[idx];
-                    const hasVisual = ['equation', 'diagram', 'chart'].includes(s.layout);
-                    if (!hasVisual) continue;
-                    
-                    const slideDom = document.getElementById(`slide-${idx}`);
-                    if (!slideDom) continue;
-                    
-                    // For charts: grab Chart.js canvas directly (pixel-perfect, no html2canvas)
-                    if (s.layout === 'chart') {
-                        const chartCanvas = slideDom.querySelector('canvas');
-                        if (chartCanvas) {
-                            try {
-                                window.visualCaptures[idx] = chartCanvas.toDataURL('image/png');
-                            } catch(e) { console.warn('Chart capture failed for slide ' + idx, e); }
-                        }
-                        continue;
-                    }
-                    
-                    // For equations & diagrams: use html2canvas once now while rendering is fresh
-                    const visualBox = slideDom.querySelector('.visual-box');
-                    if (visualBox) {
-                        try {
-                            const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' });
-                            window.visualCaptures[idx] = canvas.toDataURL('image/png');
-                        } catch(e) { console.warn('Visual pre-capture failed for slide ' + idx, e); }
-                    }
-                }
-                console.log('Pre-captured ' + Object.keys(window.visualCaptures).length + ' visual boxes for PPTX export.');
-            }, 1500); // Wait 1.5s for fonts, charts, and mermaid to fully settle
         }
 
         // ---------- PPTX NATIVE GENERATION ENGINE ----------
@@ -1126,28 +1091,35 @@
                             if (tableData.length > 0) pptSlide.addTable(tableData, { x: tX, y: 1.4, w: tW });
                         } 
                         else if (hasVisual) {
-                            const vX = (s.bullets && s.bullets.length > 0) ? 5.0 : 0.5;
-                            const vW = (s.bullets && s.bullets.length > 0) ? 4.5 : 9.0;
-                            const vY = (s.bullets && s.bullets.length > 0) ? 1.4 : 1.1;
-                            const vH = (s.bullets && s.bullets.length > 0) ? 3.2 : 4.0;
-                            
-                            // Use pre-captured screenshot if available
-                            let imgData = window.visualCaptures ? window.visualCaptures[i] : null;
-                            
-                            // Fallback: capture live if pre-capture wasn't stored
-                            if (!imgData) {
-                                const slideDom = document.getElementById(`slide-${i}`);
-                                const visualBox = slideDom ? slideDom.querySelector('.visual-box') : null;
-                                if (visualBox) {
+                            const slideDom = document.getElementById(`slide-${i}`);
+                            const visualBox = slideDom ? slideDom.querySelector('.visual-box') : null;
+                            if (visualBox) {
+                                const vX = (s.bullets && s.bullets.length > 0) ? 5.0 : 0.5;
+                                const vW = (s.bullets && s.bullets.length > 0) ? 4.5 : 9.0;
+                                const vY = (s.bullets && s.bullets.length > 0) ? 1.4 : 1.1;
+                                const vH = (s.bullets && s.bullets.length > 0) ? 3.2 : 4.0;
+                                
+                                let imgData = null;
+                                
+                                // Charts: grab Chart.js canvas directly (no html2canvas needed)
+                                if (s.layout === 'chart') {
+                                    const chartCanvas = visualBox.querySelector('canvas');
+                                    if (chartCanvas) {
+                                        try { imgData = chartCanvas.toDataURL('image/png'); } catch(e) {}
+                                    }
+                                }
+                                
+                                // Equations & Diagrams: use html2canvas
+                                if (!imgData) {
                                     try {
                                         const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' });
                                         imgData = canvas.toDataURL('image/png');
-                                    } catch(e) { console.warn('Fallback capture failed for slide ' + i, e); }
+                                    } catch(e) { console.warn('Visual capture failed for slide ' + i, e); }
                                 }
-                            }
-                            
-                            if (imgData) {
-                                pptSlide.addImage({ data: imgData, x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
+                                
+                                if (imgData) {
+                                    pptSlide.addImage({ data: imgData, x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
+                                }
                             }
                         }
                     }
