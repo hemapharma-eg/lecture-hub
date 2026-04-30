@@ -1044,52 +1044,30 @@
                                 const vY = (s.bullets && s.bullets.length > 0) ? 1.4 : 1.1;
                                 const vH = (s.bullets && s.bullets.length > 0) ? 3.2 : 4.0;
                                 
-                                const isEquation = s.layout === 'equation';
-                                let tempStyle = null;
-                                if (isEquation) {
-                                    tempStyle = document.createElement('style');
-                                    tempStyle.innerHTML = `.katex-frac-line { border-bottom: none !important; height: 1.5px !important; background-color: #1e293b !important; }`;
-                                    document.head.appendChild(tempStyle);
-                                    
-                                    const katexEls = visualBox.querySelectorAll('.katex *');
-                                    katexEls.forEach(el => {
-                                        if (el.style.top) {
-                                            el.dataset.origTop = el.style.top;
-                                            const comp = window.getComputedStyle(el);
-                                            el.style.transform = `translateY(${comp.top})`;
-                                            el.style.top = '0px';
-                                        }
-                                        if (el.style.bottom) {
-                                            el.dataset.origBottom = el.style.bottom;
-                                            const comp = window.getComputedStyle(el);
-                                            el.style.transform = `translateY(-${comp.bottom})`;
-                                            el.style.bottom = '0px';
-                                        }
+                                // Clone the visual box off-screen so we never touch the live DOM
+                                const clone = visualBox.cloneNode(true);
+                                clone.style.position = 'absolute';
+                                clone.style.left = '-9999px';
+                                clone.style.top = '0px';
+                                clone.style.width = visualBox.offsetWidth + 'px';
+                                clone.style.backgroundColor = '#ffffff';
+                                document.body.appendChild(clone);
+                                
+                                // For equations: fix KaTeX fraction lines on the clone only
+                                if (s.layout === 'equation') {
+                                    clone.querySelectorAll('.katex, .katex *').forEach(el => {
+                                        el.style.boxSizing = 'content-box';
                                     });
                                 }
                                 
-                                const canvas = await html2canvas(visualBox, { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' });
-                                
-                                if (isEquation) {
-                                    if (tempStyle) {
-                                        document.head.removeChild(tempStyle);
-                                    }
-                                    const katexEls = visualBox.querySelectorAll('.katex *');
-                                    katexEls.forEach(el => {
-                                        if (el.dataset.origTop) {
-                                            el.style.top = el.dataset.origTop;
-                                            el.style.transform = '';
-                                            delete el.dataset.origTop;
-                                        }
-                                        if (el.dataset.origBottom) {
-                                            el.style.bottom = el.dataset.origBottom;
-                                            el.style.transform = '';
-                                            delete el.dataset.origBottom;
-                                        }
-                                    });
+                                try {
+                                    const canvas = await html2canvas(clone, { scale: 2, logging: false, useCORS: true, backgroundColor: '#ffffff' });
+                                    pptSlide.addImage({ data: canvas.toDataURL('image/png'), x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
+                                } catch(captureErr) {
+                                    console.warn('Visual capture failed for slide ' + i, captureErr);
                                 }
                                 
-                                pptSlide.addImage({ data: canvas.toDataURL('image/png'), x: vX, y: vY, w: vW, h: vH, sizing: { type: 'contain', w: vW, h: vH } });
+                                document.body.removeChild(clone);
                             }
                         }
                     }
