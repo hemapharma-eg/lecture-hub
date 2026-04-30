@@ -626,7 +626,7 @@
                                                 layout: { type: "STRING", description: "Must be: title | content | equation | table | chart | diagram" },
                                                 title: { type: "STRING", description: "The title of the slide" },
                                                 bullets: { type: "ARRAY", items: { type: "STRING" }, description: "Array of bullet points for the slide content. Must be generated for all text-heavy slides." },
-                                                latex: { type: "STRING", description: "Raw LaTeX equation string without formatting or dollars." },
+                                                latex: { type: "STRING", description: "Raw LaTeX equation string without dollar signs. If multiple equations, separate each with \\\\\\\\ (double backslash) on its own. Example: 'E = mc^2 \\\\\\\\ F = ma'" },
                                                 table_html: { type: "STRING" },
                                                 chart_data: { 
                                                     type: "OBJECT",
@@ -747,8 +747,15 @@
                 if (s.layout === 'equation') {
                     let mathString = s.latex || "";
                     mathString = mathString.replace(/\\?frac/g, '\\frac');
-                    // Split multiple equations on \\\\ so each renders on its own line
-                    const eqParts = mathString.split(/\\\\/).map(p => p.trim()).filter(p => p.length > 0);
+                    // Split multiple equations: try \\ first, then detect separate equations by pattern
+                    let eqParts = mathString.split(/\\\\/).map(p => p.trim()).filter(p => p.length > 0);
+                    // If no split happened and the string contains multiple separate equations, try splitting on standalone equation boundaries
+                    if (eqParts.length === 1) {
+                        // Split where a new variable assignment starts after a previous expression ends
+                        // e.g. "...k_{21}Ct  C_p = ..." -> split before "C_p ="
+                        const multiEqSplit = eqParts[0].split(/(?<=\})\s+(?=[A-Za-z_{}\\]+\s*=)|(?<=[A-Za-z_{}t])\s{2,}(?=[A-Za-z_{}\\]+\s*=)/).map(p => p.trim()).filter(p => p.length > 0);
+                        if (multiEqSplit.length > 1) eqParts = multiEqSplit;
+                    }
                     let renderedMath = "";
                     eqParts.forEach(part => {
                         try {
