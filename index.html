@@ -131,6 +131,27 @@
         /* Fix Mermaid diagram compression */
         .mermaid { width: 100%; display: flex; justify-content: center; }
         .mermaid svg { max-width: 100% !important; height: auto !important; }
+
+        /* Print / PDF Export Styles */
+        @media print {
+            @page { size: landscape; margin: 0; }
+            body { background: white !important; min-height: auto; overflow: visible; }
+            body > *:not(#presentation-area) { display: none !important; }
+            #presentation-area { display: block !important; padding-top: 0 !important; }
+            .slide-container {
+                width: 100vw !important; height: 100vh !important;
+                margin: 0 !important; box-shadow: none !important;
+                page-break-after: always; break-after: page;
+                -webkit-print-color-adjust: exact; print-color-adjust: exact;
+            }
+            .slide-container:last-child { page-break-after: avoid; break-after: avoid; }
+            .slide-container::before { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .bg-dark-slide { background-color: #0f172a !important; color: #f8fafc !important; }
+            .insight-box { background: #f0f9ff !important; }
+            .bg-dark-slide .insight-box { background: #082f49 !important; }
+            .visual-box { background: white !important; }
+            canvas { max-width: 100% !important; max-height: 100% !important; }
+        }
     
 /* EduWeaver Styles */
 
@@ -224,6 +245,7 @@
     <div class="w-full flex justify-end gap-3 px-8 py-4 bg-transparent mb-2 max-w-[1280px]">
         <button class="btn btn-secondary" onclick="resetApp()"><i class="fas fa-plus"></i> New Project</button>
         <button id="export-btn" class="btn btn-primary" style="display:none" onclick="exportToPPTX()"><i class="fas fa-file-export"></i> Export PPTX</button>
+        <button id="export-pdf-btn" class="btn btn-primary" style="display:none; background-color: #0ea5e9;" onclick="exportToPDF()"><i class="fas fa-file-pdf"></i> Export PDF</button>
     </div>
 
     <!-- Lecture Processing Grid -->
@@ -726,6 +748,7 @@
             document.getElementById('lecture-processing-screen').style.display = 'none';
             document.getElementById('presentation-area').style.display = 'flex';
             document.getElementById('export-btn').style.display = 'inline-block';
+            document.getElementById('export-pdf-btn').style.display = 'inline-block';
             renderDecks(window.currentData);
         }
 
@@ -963,6 +986,10 @@
             });
             
             return rows;
+        }
+
+        function exportToPDF() {
+            window.print();
         }
 
         async function exportToPPTX() {
